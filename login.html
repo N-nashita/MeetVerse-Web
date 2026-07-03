@@ -1,0 +1,77 @@
+
+</html><!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Moon+Dance&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <canvas id="canvas"></canvas>
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+    <div class="grid-overlay"></div>
+
+    <nav>
+        <a class="logo" href="index.html">
+            <div class="logo-icon">M</div>
+            <span class="logo-text">Meet<span>Verse</span></span>
+        </a>
+        <ul class="nav-links">
+            <li><a href="index.html#features">Features</a></li>
+            <li><a href="index.html#meetings">Meetings</a></li>
+            <li><a href="index.html#database">Database</a></li>
+        </ul>
+        <div class="nav-actions">
+            <button class="btn-ghost" onclick="location.href='login.html'">Sign In</button>
+            <button class="btn-primary" onclick="location.href='register.html'">Get Started</button>
+        </div>
+    </nav>
+
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h2>Welcome <em
+                        style="font-style:normal;background:linear-gradient(135deg,#60a5fa,#93c5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Back</em>
+                </h2>
+                <p>Sign in to manage your meetings.</p>
+            </div>
+
+            <form action="login.php" method="POST">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" placeholder="you@company.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="••••••••" required>
+                </div>
+                <div id="err-msg" style="color: rgba(255, 0, 0, 0.558); display: none; margin-bottom: 1rem; font-size: 0.83rem;">
+                </div>
+                <button type="submit" class="btn-auth">Sign In</button>
+            </form>
+
+            <p class="auth">Don't have an account? <a href="register.html">Create</a></p>
+        </div>
+    </div>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const error = params.get('error');
+        if (error) {
+            const box = document.getElementById('err-msg');
+            box.textContent = error;
+            box.style.display = 'block';
+        }
+    </script>
+</body>
+
+</html>

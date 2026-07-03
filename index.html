@@ -12,9 +12,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Allura&family=Great+Vibes&family=Moon+Dance&family=Parisienne&family=Pinyon+Script&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Allura&family=Great+Vibes&family=Moon+Dance&family=Parisienne&family=Pinyon+Script&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -25,24 +23,22 @@
     <div class="orb orb3"></div>
     <div class="grid-overlay"></div>
 
-    <!-- Navbar -->
     <nav>
-        <a class="logo" href="#">
+        <a class="logo" href="index.html">
             <div class="logo-icon">M</div>
             <span class="logo-text">Meet<span>Verse</span></span>
         </a>
         <ul class="nav-links">
-            <li><a href="#features">Features</a></li>
-            <li><a href="#meetings">Meetings</a></li>
-            <li><a href="#database">Database</a></li>
+            <li><a href="index.html#features">Features</a></li>
+            <li><a href="index.html#meetings">Meetings</a></li>
+            <li><a href="index.html#dashboard">Dashboard</a></li>
         </ul>
         <div class="nav-actions">
-            <button class="btn-ghost">Sign In</button>
-            <button class="btn-primary">Get Started</button>
+            <button class="btn-ghost" onclick="location.href='login.html'">Sign In</button>
+            <button class="btn-primary" onclick="location.href='register.html'">Get Started</button>
         </div>
     </nav>
 
-    <!-- Hero -->
     <section class="hero">
         <div class="hero-inner">
             <div class="badge">
@@ -51,26 +47,63 @@
             </div>
             <h1>Your Meetings.<br><em>Structured. Tracked.</em><br>Accountable.</h1>
             <p class="hero-sub">MeetVerse gives corporate teams a disciplined framework for scheduling and managing
-                meetings — with conflict prevention, attendance tracking, and reporting all enforced at the database
-                level.</p>
+                meetings - with conflict prevention, attendance tracking, and reporting all enforced at one place.</p>
             <div class="hero-cta">
-                <a href="#" class="btn-lg solid">Schedule a Meeting</a>
-                <a href="#features" class="btn-lg outline">Explore Features</a>
+                <a href="login.html" class="btn-lg solid">Schedule a Meeting</a>
+                <a href="index.html#features" class="btn-lg outline">Explore Features</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="features">
+        <div class="reveal">
+            <div class="section-eyebrow">Capabilities</div>
+            <div class="section-heading">Built for how organisations actually run.</div>
+            <p class="section-body">Every feature is grounded in a real business rule - not a UI convenience. The database enforces the logic so the application never has to guess.</p>
+        </div>
+        <div class="features-grid reveal">
+            <div class="fc">
+                <div class="fc-icon">📅</div>
+                <div class="fc-title">Meeting Scheduling</div>
+                <div class="fc-desc">Create structured meetings with title, agenda, department, date and time. Modifications and cancellations are tracked with full audit history.</div>
+            </div>
+            <div class="fc">
+                <div class="fc-icon">🔒</div>
+                <div class="fc-title">Participant Conflict Guard</div>
+                <div class="fc-desc">A database trigger rejects any participant addition that would result in a time overlap with an existing meeting.</div>
+            </div>
+            <div class="fc">
+                <div class="fc-icon">🔔</div>
+                <div class="fc-title">Automatic Notifications</div>
+                <div class="fc-desc">Receive timely alerts about meeting changes, cancellations, and reminders. </div>
+            </div>
+            <div class="fc">
+                <div class="fc-icon">🔍</div>
+                <div class="fc-title">Search, Filter & Sort</div>
+                <div class="fc-desc">Retrieve meetings by department, organiser, date range or status. Results are served through optimised database views, not raw table scans.</div>
+            </div>
+            <div class="fc">
+                <div class="fc-icon">📊</div>
+                <div class="fc-title">Attendance Reporting</div>
+                <div class="fc-desc">Generate per-meeting and per-employee attendance summaries using server-side database queries.</div>
+            </div>
+            <div class="fc">
+                <div class="fc-icon">👥</div>
+                <div class="fc-title">Participant Analytics</div>
+                <div class="fc-desc">Query total meeting load per employee, identify availability windows, and manage participant lists through a clean, validated interface.</div>
             </div>
         </div>
     </section>
 
     <footer>
-        <span class="footer-copy">© 2025 MeetVerse · Built with Laravel + Oracle PL/SQL</span>
+        <span class="footer-copy">© 2025 MeetVerse · Built with php + Oracle PL/SQL</span>
         <div class="footer-links">
-            <a href="#">Dashboard</a>
-            <a href="#">Meetings</a>
-            <a href="#">Reports</a>
-            <a href="#">Admin</a>
+            <a href="">Dashboard</a>
+            <a href="">Meetings</a>
+            <a href="">Reports</a>
+            <a href="">Admin</a>
         </div>
     </footer>
-
-    <script src="main.js"></script>
 </body>
 
 </html>
