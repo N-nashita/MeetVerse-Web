@@ -7,6 +7,8 @@ if (!isset($_SESSION['emp_id'])) {
     exit();
 }
 
+$dashboardUrl = ($_SESSION['role'] === 'ADMIN') ? 'admin_dashboard.php' : 'member_dashboard.php';
+
 $error = $_GET['error'] ?? '';
 $empStmt = $pdo->query("SELECT emp_id, first_name, last_name, department FROM employees ORDER BY first_name");
 $employees = $empStmt->fetchAll(PDO::FETCH_ASSOC);

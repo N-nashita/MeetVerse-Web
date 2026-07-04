@@ -22,7 +22,12 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
 if($user && password_verify($password, $user['PASSWORD'])) {
     $_SESSION['emp_id'] = $user['EMP_ID'];
     $_SESSION['first_name'] = $user['FIRST_NAME'];
-    header('Location: admin_dashboard.php');
+    $_SESSION['role'] = $user['ROLE'];
+    if ($user['ROLE'] === 'ADMIN') {
+        header('Location: admin_dashboard.php');
+    } else {
+        header('Location: user_dashboard.php');
+    }
     exit();
 } else {
     header('Location: login.html?error=Invalid email or password');

@@ -7,8 +7,8 @@ if (!isset($_SESSION['emp_id'])) {
     exit();
 }
 
-if ($_SESSION['role'] !== 'ADMIN') {
-    header('Location: user_dashboard.php');
+if ($_SESSION['role'] !== 'MEMBER') {
+    header('Location: admin_dashboard.php');
     exit();
 }
 
@@ -45,7 +45,7 @@ $totalMeetings = $meetingStmt->fetchColumn();
       </a>
 
       <span class="nav-label">Main</span>
-      <a class="nav-item active" href="admin_dashboard.php">
+      <a class="nav-item active" href="member_dashboard.php">
         <span class="icon">⊞</span> Dashboard
       </a>
       <a class="nav-item" href="create_meeting.php">
@@ -75,7 +75,7 @@ $totalMeetings = $meetingStmt->fetchColumn();
           </div>
           <div class="user-info">
             <p><?= htmlspecialchars($_SESSION['first_name']) ?></p>
-            <span>Admin</span>
+            <span>Member</span>
           </div>
         </div>
         <a href="logout.php" class="logout-btn">Sign Out</a>
@@ -88,6 +88,7 @@ $totalMeetings = $meetingStmt->fetchColumn();
         <h1>Good to see you, <?= htmlspecialchars($_SESSION['first_name']) ?> 👋</h1>
         <p>Here's what's happening in MeetVerse today.</p>
         </div>
+        <a href="create_meeting.php" class="btn-submit" style="text-decoration:none; align-self:flex-start;">+ Launch Meeting</a>
       </div>
 
       <div class="stats-grid">
