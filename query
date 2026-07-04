@@ -7,6 +7,7 @@ CREATE TABLE employees (
     email VARCHAR2(100) NOT NULL UNIQUE,
     department VARCHAR2(100),
     password VARCHAR2(255) NOT NULL,
+    role VARCHAR2(20) DEFAULT 'MEMBER' NOT NULL,
     created_at DATE DEFAULT SYSDATE
 );
 
@@ -36,3 +37,274 @@ CREATE TABLE attendance (
     CONSTRAINT fk_emp FOREIGN KEY (emp_id) REFERENCES employees(emp_id)
 );
 
+
+-- =====================================================================
+-- MeetVerse PL/SQL layer
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. FUNCTION: compute a meeting's live status from its timestamps
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION get_meeting_status (
+    p_start_time IN DATE,
+    p_end_time   IN DATE,
+    p_status     IN VARCHAR2
+) RETURN VARCHAR2
+IS
+BEGIN
+    IF p_status = 'Cancelled' THEN
+        RETURN 'Cancelled';
+    END IF;
+
+    IF SYSDATE < p_start_time THEN
+        RETURN 'Scheduled';
+    ELSIF SYSDATE BETWEEN p_start_time AND p_end_time THEN
+        RETURN 'Ongoing';
+    ELSE
+        RETURN 'Completed';
+    END IF;
+END;
+/
+
+-- ---------------------------------------------------------------------
+-- 2. PROCEDURE: refresh every meeting's status in one pass
+--    Called once per dashboard/meetings-page load.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE refresh_meeting_statuses
+IS
+BEGIN
+    UPDATE meetings
+    SET status = get_meeting_status(start_time, end_time, status)
+    WHERE status != 'Cancelled';
+
+    COMMIT;
+END;
+/
+
+-- ---------------------------------------------------------------------
+-- 3. TRIGGER: reject bad meeting time ranges at the database level
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE TRIGGER trg_meeting_time_check
+BEFORE INSERT OR UPDATE ON meetings
+FOR EACH ROW
+BEGIN
+    IF :NEW.end_time <= :NEW.start_time THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Meeting end time must be after start time.');
+    END IF;
+END;
+/
+
+-- ---------------------------------------------------------------------
+-- 4. PROCEDURE: create a meeting plus all attendance rows atomically
+--    p_attendee_csv: comma-separated emp_ids, e.g. '2,5,7' or NULL/''
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE create_meeting_with_attendees (
+    p_title         IN VARCHAR2,
+    p_description   IN VARCHAR2,
+    p_department    IN VARCHAR2,
+    p_start_time    IN DATE,
+    p_end_time      IN DATE,
+    p_organizer_id  IN NUMBER,
+    p_attendee_csv  IN VARCHAR2,
+    p_meeting_id    OUT NUMBER
+)
+IS
+    v_id       NUMBER;
+    v_pos      PLS_INTEGER := 1;
+    v_token    VARCHAR2(20);
+BEGIN
+    p_meeting_id := meeting_seq.NEXTVAL;
+
+    INSERT INTO meetings (
+        meeting_id, title, description, department,
+        start_time, end_time, organizer_id, status
+    ) VALUES (
+        p_meeting_id, p_title, p_description, p_department,
+        p_start_time, p_end_time, p_organizer_id, 'Scheduled'
+    );
+
+    -- Organizer is automatically an attendee, pre-accepted
+    INSERT INTO attendance (attendance_id, meeting_id, emp_id, status)
+    VALUES (attendance_seq.NEXTVAL, p_meeting_id, p_organizer_id, 'Accepted');
+
+    -- Parse the CSV of attendee IDs and insert one row per employee
+    IF p_attendee_csv IS NOT NULL AND LENGTH(TRIM(p_attendee_csv)) > 0 THEN
+        LOOP
+            v_token := REGEXP_SUBSTR(p_attendee_csv, '[^,]+', 1, v_pos);
+            EXIT WHEN v_token IS NULL;
+
+            v_id := TO_NUMBER(TRIM(v_token));
+
+            IF v_id != p_organizer_id THEN
+                INSERT INTO attendance (attendance_id, meeting_id, emp_id, status)
+                VALUES (attendance_seq.NEXTVAL, p_meeting_id, v_id, 'INVITED');
+            END IF;
+
+            v_pos := v_pos + 1;
+        END LOOP;
+    END IF;
+
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE;
+END;
+/
+
+-- ---------------------------------------------------------------------
+-- 5. PROCEDURE: cancel a meeting (organizer-only check enforced in PHP,
+--    but the procedure itself just performs the state change)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE cancel_meeting (
+    p_meeting_id IN NUMBER
+)
+IS
+BEGIN
+    UPDATE meetings
+    SET status = 'Cancelled'
+    WHERE meeting_id = p_meeting_id;
+
+    IF SQL%ROWCOUNT = 0 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Meeting not found.');
+    END IF;
+
+    COMMIT;
+END;
+/
+
+-- ---------------------------------------------------------------------
+-- 6. VIEW: convenience view joining meetings with organizer name
+--    and attendee count, used by the dashboard/meetings pages
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE VIEW meeting_overview AS
+SELECT
+    m.meeting_id,
+    m.title,
+    m.description,
+    m.department,
+    m.start_time,
+    m.end_time,
+    m.status,
+    m.organizer_id,
+    e.first_name || ' ' || e.last_name AS organizer_name,
+    (SELECT COUNT(*) FROM attendance a WHERE a.meeting_id = m.meeting_id) AS attendee_count
+FROM meetings m
+JOIN employees e ON e.emp_id = m.organizer_id;
+
+-- ============================================
+-- 1. UPDATE meeting (organizer only, resyncs attendees)
+-- ============================================
+CREATE OR REPLACE PROCEDURE update_meeting_with_attendees (
+    p_meeting_id     IN meetings.meeting_id%TYPE,
+    p_requester_id   IN employees.emp_id%TYPE,
+    p_title          IN meetings.title%TYPE,
+    p_description    IN meetings.description%TYPE,
+    p_start_time     IN meetings.start_time%TYPE,
+    p_end_time       IN meetings.end_time%TYPE,
+    p_attendee_csv   IN VARCHAR2
+) AS
+    v_organizer_id meetings.organizer_id%TYPE;
+    v_status       meetings.status%TYPE;
+    v_id           NUMBER;
+BEGIN
+    SELECT organizer_id, status INTO v_organizer_id, v_status
+    FROM meetings WHERE meeting_id = p_meeting_id;
+
+    IF v_organizer_id != p_requester_id THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Only the organizer can edit this meeting.');
+    END IF;
+
+    IF v_status = 'Cancelled' THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Cancelled meetings cannot be edited.');
+    END IF;
+
+    UPDATE meetings
+    SET title = p_title, description = p_description,
+        start_time = p_start_time, end_time = p_end_time
+    WHERE meeting_id = p_meeting_id;
+
+    DELETE FROM attendance WHERE meeting_id = p_meeting_id AND emp_id != p_requester_id;
+
+    IF p_attendee_csv IS NOT NULL AND LENGTH(TRIM(p_attendee_csv)) > 0 THEN
+        FOR i IN 1..REGEXP_COUNT(p_attendee_csv, '[^,]+') LOOP
+            v_id := TO_NUMBER(REGEXP_SUBSTR(p_attendee_csv, '[^,]+', 1, i));
+            IF v_id IS NOT NULL AND v_id != 0 AND v_id != p_requester_id THEN
+                INSERT INTO attendance (attendance_id, meeting_id, emp_id, status)
+                VALUES (attendance_seq.NEXTVAL, p_meeting_id, v_id, 'INVITED');
+            END IF;
+        END LOOP;
+    END IF;
+
+    refresh_meeting_statuses;
+    COMMIT;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Meeting not found.');
+    WHEN OTHERS THEN
+        ROLLBACK; RAISE;
+END update_meeting_with_attendees;
+/
+
+-- ============================================
+-- 2. CANCEL (soft delete) — organizer only
+--    Replaces the earlier 1-arg cancel_meeting entirely (name-based replace)
+-- ============================================
+CREATE OR REPLACE PROCEDURE cancel_meeting (
+    p_meeting_id   IN meetings.meeting_id%TYPE,
+    p_requester_id IN employees.emp_id%TYPE
+) AS
+    v_organizer_id meetings.organizer_id%TYPE;
+BEGIN
+    SELECT organizer_id INTO v_organizer_id
+    FROM meetings WHERE meeting_id = p_meeting_id;
+
+    IF v_organizer_id != p_requester_id THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Only the organizer can cancel this meeting.');
+    END IF;
+
+    UPDATE meetings SET status = 'Cancelled' WHERE meeting_id = p_meeting_id;
+    COMMIT;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Meeting not found.');
+    WHEN OTHERS THEN
+        ROLLBACK; RAISE;
+END cancel_meeting;
+/
+
+-- ============================================
+-- 3. Filter + sort meetings, returns REF CURSOR
+--    (uses attendance, not meeting_participants)
+-- ============================================
+CREATE OR REPLACE PROCEDURE get_filtered_meetings (
+    p_emp_id      IN employees.emp_id%TYPE,
+    p_status      IN VARCHAR2 DEFAULT 'ALL',
+    p_department  IN VARCHAR2 DEFAULT 'ALL',
+    p_only_mine   IN VARCHAR2 DEFAULT 'N',
+    p_sort        IN VARCHAR2 DEFAULT 'start_desc',
+    p_cursor      OUT SYS_REFCURSOR
+) AS
+    v_sql VARCHAR2(4000);
+BEGIN
+    refresh_meeting_statuses;
+
+    v_sql := 'SELECT meeting_id, title, description, department, start_time, end_time,
+                     status, organizer_id, organizer_name, attendee_count
+              FROM meeting_overview
+              WHERE (:st1 = ''ALL'' OR status = :st2)
+                AND (:dp1 = ''ALL'' OR department = :dp2)
+                AND (:mine != ''Y'' OR organizer_id = :eid1
+                     OR meeting_id IN (SELECT meeting_id FROM attendance WHERE emp_id = :eid2))';
+
+    v_sql := v_sql || CASE p_sort
+        WHEN 'start_asc'  THEN ' ORDER BY start_time ASC'
+        WHEN 'status'     THEN ' ORDER BY status, start_time DESC'
+        WHEN 'department' THEN ' ORDER BY department, start_time DESC'
+        ELSE                   ' ORDER BY start_time DESC'
+    END;
+
+    OPEN p_cursor FOR v_sql USING p_status, p_status, p_department, p_department,
+                                   p_only_mine, p_emp_id, p_emp_id;
+END get_filtered_meetings;
+/

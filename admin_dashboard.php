@@ -7,8 +7,12 @@ if (!isset($_SESSION['emp_id'])) {
     exit();
 }
 
+if (!isset($_SESSION['role']) || $_SESSION['role'] === '') {
+    header('Location: logout.php');
+    exit();
+}
 if ($_SESSION['role'] !== 'ADMIN') {
-    header('Location: user_dashboard.php');
+    header('Location: member_dashboard.php');
     exit();
 }
 
@@ -23,6 +27,29 @@ $totalDepts = $deptStmt->fetchColumn();
 
 $meetingStmt = $pdo->query("SELECT COUNT(*) FROM meetings");
 $totalMeetings = $meetingStmt->fetchColumn();
+
+function formatMeetingTime($value, $format) {
+  $dateTime = DateTime::createFromFormat('Y-m-d H:i:s', $value);
+  if (!$dateTime) {
+    $timestamp = strtotime($value);
+    return $timestamp ? date($format, $timestamp) : $value;
+  }
+
+  return $dateTime->format($format);
+}
+
+// Refresh statuses via PL/SQL, then pull anything currently Ongoing
+$pdo->query("BEGIN refresh_meeting_statuses; END;");
+$ongoingStmt = $pdo->query("
+        SELECT meeting_id, title, description,
+          TO_CHAR(start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
+          TO_CHAR(end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time,
+          organizer_name, attendee_count
+    FROM meeting_overview
+    WHERE status = 'Ongoing'
+    ORDER BY start_time
+");
+$ongoingMeetings = $ongoingStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -48,7 +75,7 @@ $totalMeetings = $meetingStmt->fetchColumn();
       <a class="nav-item active" href="admin_dashboard.php">
         <span class="icon">⊞</span> Dashboard
       </a>
-      <a class="nav-item" href="create_meeting.php">
+      <a class="nav-item" href="meeting.php">
         <span class="icon">📅</span> Meetings
       </a>
       <a class="nav-item" href="employees.php">
@@ -104,6 +131,35 @@ $totalMeetings = $meetingStmt->fetchColumn();
           <div class="stat-value"><?= $totalMeetings ?></div>
         </div>
       </div>
+
+      <?php if (count($ongoingMeetings) > 0): ?>
+      <div class="table-card" style="margin-bottom:1.5rem;">
+        <div class="table-header">
+          <h3>🟢 Ongoing Meetings</h3>
+          <span><?= count($ongoingMeetings) ?> live now</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Organizer</th>
+              <th>Time</th>
+              <th>Attendees</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($ongoingMeetings as $m): ?>
+              <tr>
+                <td><?= htmlspecialchars($m['TITLE']) ?></td>
+                <td><?= htmlspecialchars($m['ORGANIZER_NAME']) ?></td>
+                <td><?= formatMeetingTime($m['START_TIME'], 'g:i A') ?> – <?= formatMeetingTime($m['END_TIME'], 'g:i A') ?></td>
+                <td><?= (int)$m['ATTENDEE_COUNT'] ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+      <?php endif; ?>
 
       <div class="table-card">
         <div class="table-header">

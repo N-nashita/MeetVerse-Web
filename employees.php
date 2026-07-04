@@ -34,7 +34,7 @@ $totalEmployees = $countstmt->fetchColumn();
       <a class="nav-item active" href="admin_dashboard.php">
         <span class="icon">⊞</span> Dashboard
       </a>
-      <a class="nav-item" href="create_meeting.php">
+      <a class="nav-item" href="meeting.php">
         <span class="icon">📅</span> Meetings
       </a>
       <a class="nav-item" href="employees.php">

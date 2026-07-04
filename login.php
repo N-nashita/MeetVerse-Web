@@ -15,18 +15,18 @@ if(!$email || !$password) {
     exit();
 }
 
-$stmt = $pdo->prepare("SELECT EMP_ID, FIRST_NAME, PASSWORD FROM employees WHERE EMAIL = :email");
+$stmt = $pdo->prepare("SELECT EMP_ID, FIRST_NAME, ROLE, PASSWORD FROM employees WHERE EMAIL = :email");
 $stmt->execute(['email' => $email]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if($user && password_verify($password, $user['PASSWORD'])) {
     $_SESSION['emp_id'] = $user['EMP_ID'];
     $_SESSION['first_name'] = $user['FIRST_NAME'];
-    $_SESSION['role'] = $user['ROLE'];
-    if ($user['ROLE'] === 'ADMIN') {
+    $_SESSION['role'] = $user['ROLE'] ?: 'MEMBER';
+    if ($_SESSION['role'] === 'ADMIN') {
         header('Location: admin_dashboard.php');
     } else {
-        header('Location: user_dashboard.php');
+        header('Location: member_dashboard.php');
     }
     exit();
 } else {

@@ -31,10 +31,10 @@ $employees = $empStmt->fetchAll(PDO::FETCH_ASSOC);
         <span class="logo-text">Meet<em>Verse</em></span>
       </a>
       <span class="nav-label">Main</span>
-      <a class="nav-item" href="admin_dashboard.php">
+      <a class="nav-item" href="<?= $dashboardUrl ?>">
         <span class="icon">⊞</span> Dashboard
       </a>
-      <a class="nav-item active" href="create_meeting.php">
+      <a class="nav-item active" href="meeting.php">
         <span class="icon">📅</span> Meetings
       </a>
       <a class="nav-item" href="employees.php">
@@ -58,7 +58,7 @@ $employees = $empStmt->fetchAll(PDO::FETCH_ASSOC);
           </div>
           <div class="user-info">
             <p><?= htmlspecialchars($_SESSION['first_name']) ?></p>
-            <span>Admin</span>
+            <span><?= $_SESSION['role'] === 'ADMIN' ? 'Admin' : 'Member' ?></span>
           </div>
         </div>
         <a href="logout.php" class="logout-btn">Sign Out</a>
@@ -71,7 +71,7 @@ $employees = $empStmt->fetchAll(PDO::FETCH_ASSOC);
           <h1>Schedule a Meeting</h1>
           <p>Fill in the details to select meeting date and invite attendees.</p>
         </div>
-        <a href="admin_dashboard.php" class="btn-cancel">← Back</a>
+        <a href="<?= $dashboardUrl ?>" class="btn-cancel">← Back</a>
       </div>
 
       <?php if($error): ?>
@@ -114,7 +114,7 @@ $employees = $empStmt->fetchAll(PDO::FETCH_ASSOC);
           </div>
           <div class="form-actions">
             <button type="submit" class="btn-submit">Schedule Meeting</button>
-            <a href="admin_dashboard.php" class="btn-cancel">Cancel</a>
+            <a href="<?= $dashboardUrl ?>" class="btn-cancel">Cancel</a>
           </div>
         </form>
       </div>
