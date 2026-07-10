@@ -189,10 +189,7 @@ function statusClass($status) {
         <span class="icon">👥</span> Employees
       </a>
       <span class="nav-label">Reports</span>
-      <a class="nav-item" href="#">
-        <span class="icon">📊</span> Analytics
-      </a>
-      <a class="nav-item" href="#">
+      <a class="nav-item" href="reports.php">
         <span class="icon">📋</span> Reports
       </a>
       <span class="nav-label">System</span>

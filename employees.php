@@ -31,21 +31,18 @@ $totalEmployees = $countstmt->fetchColumn();
       </a>
 
       <span class="nav-label">Main</span>
-      <a class="nav-item active" href="admin_dashboard.php">
+      <a class="nav-item" href="admin_dashboard.php">
         <span class="icon">⊞</span> Dashboard
       </a>
       <a class="nav-item" href="meeting.php">
         <span class="icon">📅</span> Meetings
       </a>
-      <a class="nav-item" href="employees.php">
+      <a class="nav-item active" href="employees.php">
         <span class="icon">👥</span> Employees
       </a>
 
       <span class="nav-label">Reports</span>
-      <a class="nav-item" href="#">
-        <span class="icon">📊</span> Analytics
-      </a>
-      <a class="nav-item" href="#">
+      <a class="nav-item" href="reports.php">
         <span class="icon">📋</span> Reports
       </a>
 
@@ -61,7 +58,7 @@ $totalEmployees = $countstmt->fetchColumn();
           </div>
           <div class="user-info">
             <p><?= htmlspecialchars($_SESSION['first_name']) ?></p>
-            <span>Admin</span>
+            <span><?= $_SESSION['role'] === 'ADMIN' ? 'Admin' : 'Member' ?></span>
           </div>
         </div>
         <a href="logout.php" class="logout-btn">Sign Out</a>
