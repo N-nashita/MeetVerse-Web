@@ -47,10 +47,11 @@ $totalEmployees = $countstmt->fetchColumn();
       </a>
 
       <span class="nav-label">System</span>
-      <a class="nav-item" href="#">
+      <?php $settingsPage = ($_SESSION['role']) === 'ADMIN' ? 'admin_settings.php' : 'member_settings.php'; ?>
+      <a class="nav-item" href="<?= $settingsPage ?>">
         <span class="icon">⚙️</span> Settings
       </a>
-
+      
       <div class="sidebar-footer">
         <div class="user-pill">
           <div class="user-avatar">

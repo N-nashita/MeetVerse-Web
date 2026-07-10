@@ -37,14 +37,7 @@ CREATE TABLE attendance (
     CONSTRAINT fk_emp FOREIGN KEY (emp_id) REFERENCES employees(emp_id)
 );
 
-
--- =====================================================================
--- MeetVerse PL/SQL layer
--- =====================================================================
-
--- ---------------------------------------------------------------------
--- 1. FUNCTION: compute a meeting's live status from its timestamps
--- ---------------------------------------------------------------------
+-- FUNCTION: compute a meeting's live status from its timestamps
 CREATE OR REPLACE FUNCTION get_meeting_status (
     p_start_time IN DATE,
     p_end_time   IN DATE,
@@ -66,10 +59,8 @@ BEGIN
 END;
 /
 
--- ---------------------------------------------------------------------
--- 2. PROCEDURE: refresh every meeting's status in one pass
+--  PROCEDURE: refresh every meeting's status in one pass
 --    Called once per dashboard/meetings-page load.
--- ---------------------------------------------------------------------
 CREATE OR REPLACE PROCEDURE refresh_meeting_statuses
 IS
 BEGIN
@@ -81,7 +72,6 @@ BEGIN
 END;
 /
 
--- ---------------------------------------------------------------------
 -- 3. TRIGGER: reject bad meeting time ranges at the database level
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE TRIGGER trg_meeting_time_check
@@ -307,4 +297,158 @@ BEGIN
     OPEN p_cursor FOR v_sql USING p_status, p_status, p_department, p_department,
                                    p_only_mine, p_emp_id, p_emp_id;
 END get_filtered_meetings;
+/
+
+-- Log table
+CREATE SEQUENCE log_seq START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE activity_log (
+    log_id     NUMBER PRIMARY KEY,
+    action     VARCHAR2(50),
+    details    VARCHAR2(500),
+    emp_id     NUMBER,
+    created_at DATE DEFAULT SYSDATE
+);
+
+-- Trigger: log new employee
+CREATE OR REPLACE TRIGGER trg_log_new_employee
+AFTER INSERT ON employees
+FOR EACH ROW
+BEGIN
+    INSERT INTO activity_log (log_id, action, details, emp_id)
+    VALUES (log_seq.NEXTVAL, 'NEW EMPLOYEE',
+            :NEW.first_name || ' ' || :NEW.last_name || ' joined ' || :NEW.department,
+            :NEW.emp_id);
+END;
+/
+
+-- Trigger: log new meeting
+CREATE OR REPLACE TRIGGER trg_log_new_meeting
+AFTER INSERT ON meetings
+FOR EACH ROW
+DECLARE 
+    o_name VARCHAR2(100);
+BEGIN
+    SELECT first_name INTO o_name FROM employees WHERE emp_id = :NEW.organizer_id;
+    INSERT INTO activity_log (log_id, action, details, emp_id) VALUES (log_seq.NEXTVAL, 'NEW MEETING', 'New meeting "' || :NEW.title || '" launched by ' || o_name, :NEW.organizer_id);
+END;
+/
+
+-- Trigger: log cancelled meeting
+CREATE OR REPLACE TRIGGER trg_log_cancel_meeting
+AFTER UPDATE OF status ON meetings
+FOR EACH ROW
+WHEN (NEW.status = 'Cancelled')
+BEGIN
+    INSERT INTO activity_log (log_id, action, details, emp_id)
+    VALUES (log_seq.NEXTVAL, 'MEETING CANCELLED',
+            'Meeting "' || :NEW.title || '" was cancelled',
+            :NEW.organizer_id);
+END;
+/
+
+-- Procedure: change password
+CREATE OR REPLACE FUNCTION change_password(
+    p_emp_id IN NUMBER,
+    P_new_pass IN VARCHAR2
+) RETURN VARCHAR2 AS
+BEGIN
+    UPDATE employees SET password = p_new_pass WHERE emp_id = p_emp_id;
+    IF SQL%ROWCOUNT = 0 THEN
+        RETURN 'NOT_FOUND';
+    END IF;
+    COMMIT;
+    RETURN 'SUCCESS';
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RETURN 'ERROR';
+END;
+/
+
+
+-- Procedure: update name
+CREATE OR REPLACE FUNCTION update_employee_name(
+    p_emp_id IN NUMBER,
+    p_first_name IN VARCHAR2,
+    p_last_name IN VARCHAR2
+) RETURN VARCHAR2 AS
+BEGIN
+    UPDATE employees SET first_name = p_first_name, last_name = p_last_name WHERE emp_id = p_emp_id;
+    COMMIT;
+    RETURN 'SUCCESS';
+EXCEPTION
+    WHEN OTHERS THEN
+    ROLLBACK;
+    RETURN 'ERROR';
+END;
+/
+
+-- Procedure: update department (admin only)
+CREATE OR REPLACE FUNCTION update_employee_department(
+    p_emp_id IN NUMBER,
+    p_dept IN VARCHAR2
+) RETURN VARCHAR2 AS
+BEGIN
+    UPDATE employees SET department = p_dept WHERE emp_id = p_emp_id;
+    IF SQL%ROWCOUNT = 0 THEN
+    RETURN 'NOT FOUND';
+    ELSE
+        COMMIT;
+        RETURN 'SUCCESS';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RETURN 'ERROR';
+END;
+/
+
+-- Procedure: remove employee (admin only)
+CREATE OR REPLACE FUNCTION remove_employee(
+    p_emp_id IN NUMBER
+) RETURN VARCHAR2 AS
+BEGIN
+    DELETE FROM attendance WHERE emp_id = p_emp_id;
+    DELETE FROM notifications WHERE emp_id = p_emp_id;
+    DELETE FROM employees WHERE emp_id = p_emp_id;
+    IF SQL%ROWCOUNT = 0 THEN
+        RETURN 'NOT_FOUND';
+    ELSE
+        COMMIT;
+        RETURN 'SUCCESS';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RETURN 'ERROR';
+END;
+/
+
+-- Notification table
+CREATE SEQUENCE notif_seq START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE notifications (
+    notif_id   NUMBER PRIMARY KEY,
+    emp_id     NUMBER NOT NULL,
+    message    VARCHAR2(500),
+    is_read    NUMBER(1) DEFAULT 0,
+    created_at DATE DEFAULT SYSDATE,
+    CONSTRAINT fk_notif_emp FOREIGN KEY (emp_id) REFERENCES employees(emp_id)
+);
+
+-- Trigger: notify attendee when invited to meeting
+CREATE OR REPLACE TRIGGER trg_notify_attendee
+AFTER INSERT ON attendance
+FOR EACH ROW
+DECLARE
+    v_title VARCHAR2(200);
+BEGIN
+    SELECT title INTO v_title FROM meetings WHERE meeting_id = :NEW.meeting_id;
+    INSERT INTO notifications (notif_id, emp_id, message)
+    VALUES (notif_seq.NEXTVAL, :NEW.emp_id,
+            'You have been invited to: "' || v_title || '"');
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END;
 /
