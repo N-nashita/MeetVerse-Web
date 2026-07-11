@@ -12,6 +12,38 @@ function isMeetingOverlapError(PDOException $e): bool
     return strpos($e->getMessage(), 'ORA-20010') !== false;
 }
 
+function formatOracleDateTime(string $value): string
+{
+    $timestamp = strtotime(str_replace('T', ' ', $value));
+    return $timestamp ? date('Y-m-d H:i:s', $timestamp) : '';
+}
+
+function getOracleConnectionFromPdo($pdo)
+{
+    if (method_exists($pdo, 'getConnection')) {
+        return $pdo->getConnection();
+    }
+
+    throw new PDOException('Oracle connection is not available.');
+}
+
+function buildAttendeeCollection($connection, array $attendees)
+{
+    $collection = oci_new_collection($connection, 'ATTENDEE_ID_TABLE');
+    if (!$collection) {
+        throw new PDOException('Could not create Oracle attendee collection.');
+    }
+
+    foreach ($attendees as $attendeeId) {
+        $attendeeId = (int)$attendeeId;
+        if ($attendeeId > 0) {
+            $collection->append($attendeeId);
+        }
+    }
+
+    return $collection;
+}
+
 $action = $_POST['action'] ?? 'create';
 $dashboardUrl = ($_SESSION['role'] === 'ADMIN') ? 'admin_dashboard.php' : 'member_dashboard.php';
 
@@ -36,7 +68,6 @@ if ($action === 'update') {
     $start_time  = $_POST['start_time'];
     $end_time    = $_POST['end_time'];
     $attendees   = $_POST['attendees'] ?? [];
-    $attendeeCsv = implode(',', array_map('intval', $attendees));
 
     if (!$title || !$start_time || !$end_time) {
         header("Location: edit_meeting.php?id=$meetingId&error=" . urlencode('Please fill in all required fields'));
@@ -44,20 +75,41 @@ if ($action === 'update') {
     }
 
     try {
-        $stmt = $pdo->prepare("BEGIN update_meeting_with_attendees(
-                    :meeting_id, :requester_id, :title, :description,
-                    TO_DATE(:start_time, 'YYYY-MM-DD HH24:MI'),
-                    TO_DATE(:end_time, 'YYYY-MM-DD HH24:MI'),
-                    :attendee_csv
-                ); END;");
-        $stmt->bindValue(':meeting_id', $meetingId);
-        $stmt->bindValue(':requester_id', $_SESSION['emp_id']);
-        $stmt->bindValue(':title', $title);
-        $stmt->bindValue(':description', $description);
-        $stmt->bindValue(':start_time', str_replace('T', ' ', $start_time));
-        $stmt->bindValue(':end_time', str_replace('T', ' ', $end_time));
-        $stmt->bindValue(':attendee_csv', $attendeeCsv);
-        $stmt->execute();
+        $connection = getOracleConnectionFromPdo($pdo);
+        $attendeeCollection = buildAttendeeCollection($connection, $attendees);
+        $meetingIdValue = $meetingId;
+        $requesterIdValue = (int)$_SESSION['emp_id'];
+        $titleValue = $title;
+        $descriptionValue = $description;
+        $startValue = formatOracleDateTime($start_time);
+        $endValue = formatOracleDateTime($end_time);
+
+        $sql = "BEGIN
+                    update_meeting_with_attendees(
+                        :meeting_id, :requester_id, :title, :description,
+                        TO_DATE(:start_time, 'YYYY-MM-DD HH24:MI:SS'),
+                        TO_DATE(:end_time, 'YYYY-MM-DD HH24:MI:SS'),
+                        :attendee_ids
+                    );
+                END;";
+        $stmt = oci_parse($connection, $sql);
+        oci_bind_by_name($stmt, ':meeting_id', $meetingIdValue, 40, SQLT_INT);
+        oci_bind_by_name($stmt, ':requester_id', $requesterIdValue, 40, SQLT_INT);
+        oci_bind_by_name($stmt, ':title', $titleValue, -1, SQLT_CHR);
+        oci_bind_by_name($stmt, ':description', $descriptionValue, -1, SQLT_CHR);
+        oci_bind_by_name($stmt, ':start_time', $startValue, -1, SQLT_CHR);
+        oci_bind_by_name($stmt, ':end_time', $endValue, -1, SQLT_CHR);
+        oci_bind_by_name($stmt, ':attendee_ids', $attendeeCollection, -1, SQLT_NTY);
+
+        if (!oci_execute($stmt, OCI_COMMIT_ON_SUCCESS)) {
+            $error = oci_error($stmt);
+            throw new PDOException('Could not execute Oracle statement. ' . ($error['message'] ?? ''));
+        }
+
+        oci_free_statement($stmt);
+        if ($attendeeCollection) {
+            $attendeeCollection->free();
+        }
         header("Location: meeting.php?success=" . urlencode('Meeting updated'));
     } catch (PDOException $e) {
         $message = isMeetingOverlapError($e)
@@ -89,59 +141,47 @@ $deptStmt = $pdo->prepare("SELECT department FROM employees WHERE emp_id = :id")
 $deptStmt->execute(['id' => $organizerId]);
 $department = $deptStmt->fetchColumn();
 
-$attendeeCsv = implode(',', array_map('intval', $attendees));
-
 try {
+    $connection = getOracleConnectionFromPdo($pdo);
+    $attendeeCollection = buildAttendeeCollection($connection, $attendees);
+    $meetingId = 0;
+    $titleValue = $title;
+    $descriptionValue = $description;
+    $departmentValue = $department;
+    $startValue = formatOracleDateTime($start_time);
+    $endValue = formatOracleDateTime($end_time);
+    $organizerIdValue = (int)$organizerId;
+
     $sql = "BEGIN
                 create_meeting_with_attendees(
                     :title, :description, :department,
-                    TO_DATE(:start_time, 'YYYY-MM-DD HH24:MI'),
-                    TO_DATE(:end_time, 'YYYY-MM-DD HH24:MI'),
-                    :organizer_id, :meeting_id_out
+                    TO_DATE(:start_time, 'YYYY-MM-DD HH24:MI:SS'),
+                    TO_DATE(:end_time, 'YYYY-MM-DD HH24:MI:SS'),
+                    :organizer_id, :attendee_ids, :meeting_id_out
                 );
             END;";
 
-    $stmt = $pdo->prepare($sql);
-    $meetingId = 0;
+    $stmt = oci_parse($connection, $sql);
+    oci_bind_by_name($stmt, ':title', $titleValue, -1, SQLT_CHR);
+    oci_bind_by_name($stmt, ':description', $descriptionValue, -1, SQLT_CHR);
+    oci_bind_by_name($stmt, ':department', $departmentValue, -1, SQLT_CHR);
+    oci_bind_by_name($stmt, ':start_time', $startValue, -1, SQLT_CHR);
+    oci_bind_by_name($stmt, ':end_time', $endValue, -1, SQLT_CHR);
+    oci_bind_by_name($stmt, ':organizer_id', $organizerIdValue, 40, SQLT_INT);
+    oci_bind_by_name($stmt, ':attendee_ids', $attendeeCollection, -1, SQLT_NTY);
+    oci_bind_by_name($stmt, ':meeting_id_out', $meetingId, 40, SQLT_INT);
 
-    $stmt->bindValue(':title', $title);
-    $stmt->bindValue(':description', $description);
-    $stmt->bindValue(':department', $department);
-    $stmt->bindValue(':start_time', str_replace('T', ' ', $start_time));
-    $stmt->bindValue(':end_time', str_replace('T', ' ', $end_time));
-    $stmt->bindValue(':organizer_id', $organizerId);
-    $stmt->bindParam(':meeting_id_out', $meetingId, PDO::PARAM_INT | PDO::PARAM_INPUT_OUTPUT, 40);
-    $stmt->execute();
-
-    $skipped = [];
-    if (!empty($attendees)) {
-        $attStmt = $pdo->prepare("BEGIN :result := check_attendee_conflict(:emp_id, :meeting_id); END;");
-        foreach ($attendees as $empId) {
-            $empId = (int)$empId;
-            if ($empId === $organizerId) continue;
-            $result = '';
-            $attStmt->bindParam(':result',     $result,   PDO::PARAM_STR, 20);
-            $attStmt->bindParam(':emp_id',     $empId,    PDO::PARAM_INT);
-            $attStmt->bindParam(':meeting_id', $meetingId, PDO::PARAM_INT);
-            $attStmt->execute();
-
-    error_log("emp_id: $empId | meeting_id: $meetingId | result: $result");
-
-
-            if ($result === 'CONFLICT') {
-                $nameRow = $pdo->prepare("SELECT first_name || ' ' || last_name FROM employees WHERE emp_id = :id");
-                $nameRow->execute([':id' => $empId]);
-                $skipped[] = $nameRow->fetchColumn();
-            }
-        }
+    if (!oci_execute($stmt, OCI_COMMIT_ON_SUCCESS)) {
+        $error = oci_error($stmt);
+        throw new PDOException('Could not execute Oracle statement. ' . ($error['message'] ?? ''));
     }
 
-    $msg = 'Meeting scheduled successfully';
-    if (!empty($skipped)) {
-        $msg .= '. Skipped due to conflict: ' . implode(', ', $skipped);
+    oci_free_statement($stmt);
+    if ($attendeeCollection) {
+        $attendeeCollection->free();
     }
 
-    header("Location: $dashboardUrl?success=" . urlencode($msg));
+    header("Location: $dashboardUrl?success=" . urlencode('Meeting scheduled successfully'));
     exit();
 
 } catch (PDOException $e) {

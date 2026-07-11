@@ -50,6 +50,18 @@ $ongoingStmt = $pdo->query("
     ORDER BY start_time
 ");
 $ongoingMeetings = $ongoingStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$pdo->query("BEGIN refresh_meeting_statuses; END;");
+$scheduledStmt = $pdo->query("
+        SELECT meeting_id, title, description,
+          TO_CHAR(start_time, 'YYYY-MM-DD HH24:MI:SS') AS start_time,
+          TO_CHAR(end_time, 'YYYY-MM-DD HH24:MI:SS') AS end_time,
+          organizer_name, attendee_count
+    FROM meeting_overview
+    WHERE status = 'Scheduled'
+    ORDER BY start_time
+");
+$scheduledMeetings = $scheduledStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -156,45 +168,35 @@ $ongoingMeetings = $ongoingStmt->fetchAll(PDO::FETCH_ASSOC);
       </div>
       <?php endif; ?>
 
-      <div class="table-card">
+      <?php if (count($scheduledMeetings) > 0): ?>
+      <div class="table-card" style="margin-bottom:1.5rem;">
         <div class="table-header">
-          <h3>All Employees</h3>
-          <span><?= $totalEmployees ?> total</span>
+          <h3>🔵 Scheduled Meetings</h3>
+          <span><?= count($scheduledMeetings) ?> upcoming</span>
         </div>
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Department</th>
-              <th>Joined</th>
+              <th>Title</th>
+              <th>Organizer</th>
+              <th>Time</th>
+              <th>Attendees</th>
             </tr>
           </thead>
           <tbody>
-            <?php if(count($employees) > 0): ?>
-              <?php foreach($employees as $emp): ?>
-                <tr>
-                  <td>
-                    <div class="emp-name">
-                      <div class="emp-avatar">
-                        <?= strtoupper(substr($emp['FIRST_NAME'], 0, 1)) ?>
-                      </div>
-                      <?= htmlspecialchars($emp['FIRST_NAME'] . ' ' . $emp['LAST_NAME']) ?>
-                    </div>
-                  </td>
-                  <td><?= htmlspecialchars($emp['EMAIL']) ?></td>
-                  <td><span class="dept-badge"><?= htmlspecialchars($emp['DEPARTMENT']) ?></span></td>
-                  <td><?= $emp['CREATED_AT'] ? date('M d, Y', strtotime($emp['CREATED_AT'])) : '—' ?></td>
-                </tr>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <tr class="empty-row">
-                <td colspan="4">No employees registered yet.</td>
+            <?php foreach ($scheduledMeetings as $m): ?>
+              <tr>
+                <td><?= htmlspecialchars($m['TITLE']) ?></td>
+                <td><?= htmlspecialchars($m['ORGANIZER_NAME']) ?></td>
+                <td><?= formatMeetingTime($m['START_TIME'], 'g:i A') ?> – <?= formatMeetingTime($m['END_TIME'], 'g:i A') ?></td>
+                <td><?= (int)$m['ATTENDEE_COUNT'] ?></td>
               </tr>
-            <?php endif; ?>
+            <?php endforeach; ?>
           </tbody>
         </table>
       </div>
+      <?php endif; ?>
+
     </main>
   </div>
 </body>

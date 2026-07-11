@@ -1,6 +1,8 @@
 <?php
 try {
-    $pdo = new PDO("oci:dbname=//localhost:1521/XE;charset=AL32UTF8", "admin", "2022");
+    require_once __DIR__ . '/oracle_pdo_compat.php';
+
+    $pdo = new OraclePdoCompat("oci:dbname=//localhost:1521/XE;charset=AL32UTF8", "admin", "2022");
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     $roleColumnStmt = $pdo->query("SELECT COUNT(*) FROM user_tab_columns WHERE table_name = 'EMPLOYEES' AND column_name = 'ROLE'");
