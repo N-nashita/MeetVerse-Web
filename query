@@ -344,9 +344,29 @@ BEGIN
         ELSE                   ' ORDER BY start_time DESC'
     END;
 
-    OPEN p_cursor FOR v_sql USING p_status, p_status, p_department, p_department,
-                                   p_only_mine, p_emp_id, p_emp_id;
+    OPEN p_cursor FOR v_sql USING p_status, p_status, p_department, p_department, p_only_mine, p_emp_id, p_emp_id;
 END get_filtered_meetings;
+/
+
+CREATE OR REPLACE PROCEDURE get_filtered_members (
+    p_emp_id      IN employees.emp_id%TYPE,
+    p_department  IN VARCHAR2 DEFAULT 'ALL',
+    p_sort        IN VARCHAR2 DEFAULT 'start_desc',
+    p_cursor      OUT SYS_REFCURSOR
+) AS
+    v_sql VARCHAR2(4000);
+BEGIN
+    v_sql := 'SELECT emp_id, first_name, last_name, email, department, role, created_at
+              FROM employees
+              WHERE (:dp1 = ''ALL'' OR department = :dp2)';
+
+    v_sql := v_sql || CASE p_sort
+        WHEN 'start_asc'  THEN ' ORDER BY created_at ASC'
+        WHEN 'department' THEN ' ORDER BY department, created_at DESC'
+        ELSE                   ' ORDER BY created_at DESC'
+    END;
+    OPEN p_cursor FOR v_sql USING p_department, p_department;
+END get_filtered_members;
 /
 
 -- Log table

@@ -194,6 +194,7 @@ nav {
 
 .btn-ghost {
   padding: 0.45rem 1.1rem;
+  text-decoration: none;
   border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 8px;
   color: var(--muted);
@@ -214,6 +215,7 @@ nav {
 
 .btn-primary {
   padding: 0.45rem 1.3rem;
+  text-decoration: none;
   background: linear-gradient(135deg, #1d4ed8, #3b82f6);
   border: none;
   border-radius: 8px;
@@ -245,27 +247,32 @@ nav {
 
 .hero-inner {
   max-width: 820px;
+  margin: 0 auto;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 0.35rem 1rem;
   border: 1px solid rgba(59, 130, 246, 0.25);
   border-radius: 100px;
   background: rgba(59, 130, 246, 0.07);
-  margin-bottom: 2.2rem;
+  margin-bottom: 2rem;
   opacity: 0;
   animation: fadeUp 0.7s 0.3s forwards;
 }
 
 .badge-dot {
+  display: inline-block;
+  margin-right: 5px;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: #22c55e;
   animation: pulse 2s infinite;
+  flex-shrink: 0;
 }
 
 @keyframes pulse {
@@ -849,9 +856,8 @@ footer {
 
 .sidebar-footer {
   margin-top: auto;
-  flex-shrink: 0;
   padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  border-top: 0.5px solid var(--border);
 }
 
 .user-pill {
@@ -868,7 +874,7 @@ footer {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0b3095, #3b82f6);
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -883,6 +889,7 @@ footer {
   color: #fff;
   font-weight: 500;
 }
+
 .user-info span {
   font-size: 0.72rem;
   color: var(--muted);
@@ -901,7 +908,7 @@ footer {
   transition: all 0.2s;
   text-align: center;
   text-decoration: none;
-  margin-top: 1rem;
+  display: block;
 }
 
 .logout-btn:hover {
@@ -910,12 +917,10 @@ footer {
   background: rgba(239, 68, 68, 0.06);
 }
 
-/* Main content */
 .main-content {
   margin-left: 240px;
   flex: 1;
-  padding: 2rem 2.5rem 3rem;
-  overflow-y: auto;
+  padding: 2.5rem 2.5rem 3rem;
   height: 100vh;
 }
 
@@ -1077,11 +1082,119 @@ tbody td {
   color: var(--accent2);
 }
 
+.role-badge {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 100px;
+  font-size: 0.72rem;
+  background: rgba(201, 220, 250, 0.629);
+  border: 1px solid rgba(167, 191, 229, 0.629);
+  color: var(--navy);
+}
+
 .empty-row td {
   text-align: center;
   color: var(--muted);
   padding: 3rem;
   font-size: 0.87rem;
+}
+
+/* Meeting page */
+.meeting-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.meeting-card {
+  background: var(--card-bg, #d9d7f0);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem;
+}
+.meeting-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.meeting-card h4 {
+  color: var(--text, #1f2937);
+  margin: 0 0 0.3rem 0;
+  font-size: 1rem;
+}
+.meeting-card p.desc {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.3rem 0 0.8rem 0;
+}
+.meeting-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.status-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.status-ongoing {
+  background: #dcfce7;
+  color: #15803d;
+}
+.status-scheduled {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.status-completed {
+  background: #f1f5f9;
+  color: #475569;
+}
+.status-cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 1.2rem;
+}
+.filter-bar select {
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+  font-size: 0.85rem;
+  background: #fff;
+}
+.filter-bar label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+.card-actions form {
+  margin: 0;
+}
+.btn-cancel-meeting {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.7rem;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 /*Meeting form*/
@@ -1202,6 +1315,7 @@ tbody td {
   display: inline-block;
 }
 .btn-cancel:hover {
+  background: rgba(72, 140, 249, 0.397);
   border-color: rgba(255, 255, 255, 0.3);
   color: #fff;
 }
@@ -1222,99 +1336,6 @@ tbody td {
 }
 
 /* Reports */
-.nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
-}
-.nav-item.active {
-  background: rgba(59, 130, 246, 0.12);
-  color: #fff;
-  border: 1px solid rgba(59, 130, 246, 0.2);
-}
-.nav-item .icon {
-  font-size: 1rem;
-  width: 20px;
-  text-align: center;
-}
-.sidebar-footer {
-  margin-top: auto;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.user-pill {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.04);
-  margin-bottom: 0.5rem;
-}
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #fff;
-  flex-shrink: 0;
-}
-.user-info p {
-  font-size: 0.82rem;
-  color: #fff;
-  font-weight: 500;
-}
-.user-info span {
-  font-size: 0.72rem;
-  color: var(--muted);
-}
-.logout-btn {
-  width: 100%;
-  padding: 0.55rem;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  color: var(--muted);
-  font-family: "DM Sans", sans-serif;
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-align: center;
-  text-decoration: none;
-  display: block;
-}
-.logout-btn:hover {
-  border-color: rgba(239, 68, 68, 0.4);
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.06);
-}
-.main-content {
-  margin-left: 240px;
-  flex: 1;
-  padding: 2.5rem 2.5rem 3rem;
-  overflow-y: auto;
-  height: 100vh;
-}
-.page-header {
-  margin-bottom: 2rem;
-}
-.page-header h1 {
-  font-family: "Playfair Display", serif;
-  font-size: 1.8rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-bottom: 0.3rem;
-}
-.page-header p {
-  color: var(--muted);
-  font-size: 0.87rem;
-}
-
 /* Summary cards */
 .summary-grid {
   display: grid;
@@ -1361,7 +1382,7 @@ tbody td {
   -webkit-text-fill-color: transparent;
 }
 .stat-value.yellow {
-  background: linear-gradient(135deg, #fbbf24, #fde68a);
+  background: linear-gradient(135deg, #4d71d6, #6c88d4);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

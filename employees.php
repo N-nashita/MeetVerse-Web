@@ -7,11 +7,35 @@ if (!isset($_SESSION['emp_id'])) {
     exit();
 }
 
-$empStmt = $pdo->query("SELECT emp_id, first_name, last_name, email, department, created_at FROM employees ORDER BY created_at DESC");
-$employees = $empStmt->fetchAll(PDO::FETCH_ASSOC);
+$conn = $pdo->getConnection();
+$dept = $_GET['department'] ?? 'ALL';
+$sort = $_GET['sort'] ?? 'start_desc';
+$departments = $pdo->query("SELECT DISTINCT department FROM employees WHERE department IS NOT NULL ORDER BY department")->fetchAll(PDO::FETCH_COLUMN);
 
-$countstmt = $pdo->query("SELECT COUNT(*) FROM employees");
-$totalEmployees = $countstmt->fetchColumn();
+$empId = $_SESSION['emp_id'];
+$deptVal = $dept === '' ? 'ALL' : $dept;
+$sortVal = $sort;
+
+$cursor = oci_new_cursor($conn);
+$stmt   = oci_parse($conn, "BEGIN get_filtered_members(:emp_id, :dept, :sort, :cursor); END;");
+
+oci_bind_by_name($stmt, ':emp_id', $empId);
+oci_bind_by_name($stmt, ':dept',   $deptVal);
+oci_bind_by_name($stmt, ':sort',   $sortVal);
+oci_bind_by_name($stmt, ':cursor', $cursor, -1, OCI_B_CURSOR);
+
+oci_execute($stmt);
+oci_execute($cursor);
+
+$employees = [];
+while ($row = oci_fetch_assoc($cursor)) {
+    $employees[] = $row;
+}
+
+oci_free_statement($cursor);
+oci_free_statement($stmt);
+
+$totalEmployees = count($employees);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -25,7 +49,7 @@ $totalEmployees = $countstmt->fetchColumn();
 </head>
 <body>
     <aside class="sidebar">
-      <a href="index.html" class="sidebar-logo">
+      <a href="index.php" class="sidebar-logo">
         <div class="logo-icon">M</div>
             <span class="logo-text">Meet<span>Verse</span></span>
       </a>
@@ -65,8 +89,27 @@ $totalEmployees = $countstmt->fetchColumn();
     </aside>
     <main class="main-content">
       <header class="page-header">
+        <div class="page-header-text">
         <h1>Employees</h1>
+        <p>Overview of the all registered employees in MeetVerse.</p>
+        </div>
       </header>
+
+      <form method="GET" class="filter-bar">
+        <select name="department" onchange="this.form.submit()">
+          <option value="">All Departments</option>
+          <?php foreach ($departments as $d): ?>
+            <option value="<?= htmlspecialchars($d) ?>" <?= $dept === $d ? 'selected' : '' ?>><?= htmlspecialchars($d) ?></option>
+          <?php endforeach; ?>
+        </select>
+
+        <select name="sort" onchange="this.form.submit()">
+          <option value="start_desc" <?= $sort === 'start_desc' ? 'selected' : '' ?>>Newest First</option>
+          <option value="start_asc" <?= $sort === 'start_asc' ? 'selected' : '' ?>>Oldest First</option>
+          <option value="department" <?= $sort === 'department' ? 'selected' : '' ?>>By Department</option>
+        </select>
+      </form>
+
     <div class="table-card">
         <div class="table-header">
           <h3>All Employees</h3>
@@ -79,6 +122,7 @@ $totalEmployees = $countstmt->fetchColumn();
               <th>Email</th>
               <th>Department</th>
               <th>Joined</th>
+              <th>Role</th>
             </tr>
           </thead>
           <tbody>
@@ -96,6 +140,7 @@ $totalEmployees = $countstmt->fetchColumn();
                   <td><?= htmlspecialchars($emp['EMAIL']) ?></td>
                   <td><span class="dept-badge"><?= htmlspecialchars($emp['DEPARTMENT']) ?></span></td>
                   <td><?= $emp['CREATED_AT'] ? date('M d, Y', strtotime($emp['CREATED_AT'])) : '—' ?></td>
+                  <td><span class="role-badge"><?= ucfirst(strtolower($emp['ROLE'])) ?></span></td>
                 </tr>
               <?php endforeach; ?>
             <?php else: ?>

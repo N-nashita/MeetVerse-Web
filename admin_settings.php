@@ -57,7 +57,7 @@ $success = $_GET['success'] ?? '';
 
   <div class="dashboard-layout">
     <aside class="sidebar">
-      <a href="index.html" class="sidebar-logo">
+      <a href="index.php" class="sidebar-logo">
         <div class="logo-icon">M</div>
         <span class="logo-text">Meet<span>Verse</span></span>
       </a>
@@ -83,8 +83,10 @@ $success = $_GET['success'] ?? '';
 
     <main class="main-content">
       <div class="page-header">
-        <h1>Admin Settings</h1>
-        <p>Manage your account and all members.</p>
+        <div class="page-header-text">
+          <h1>Admin Settings</h1>
+          <p>Manage your account and all members.</p>
+        </div>
       </div>
 
       <?php if($error): ?>

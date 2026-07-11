@@ -1,6 +1,12 @@
+<?php
+session_start();
+$loggedIn = isset($_SESSION['emp_id']);
+$role = $_SESSION['role'] ?? '';
+$dash = $role === 'ADMIN' ? 'admin_dashboard.php' : 'member_dashboard.php';
+?>
+
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,26 +22,28 @@
 </head>
 
 <body>
-
-    <canvas id="canvas"></canvas>
     <div class="orb orb1"></div>
     <div class="orb orb2"></div>
     <div class="orb orb3"></div>
     <div class="grid-overlay"></div>
 
     <nav>
-        <a class="logo" href="index.html">
+        <a class="logo" href="index.php">
             <div class="logo-icon">M</div>
             <span class="logo-text">Meet<span>Verse</span></span>
         </a>
         <ul class="nav-links">
-            <li><a href="index.html#features">Features</a></li>
-            <li><a href="index.html#meetings">Meetings</a></li>
-            <li><a href="index.html#dashboard">Dashboard</a></li>
+            <li><a href="index.php#features">Features</a></li>
+            <li><a href="<?= $loggedIn ? 'create_meeting.php' : 'login.html' ?>">Meetings</a></li>
+            <li><a href="<?= $loggedIn ? $dash : 'login.html' ?>">Dashboard</a></li>
         </ul>
         <div class="nav-actions">
-            <button class="btn-ghost" onclick="location.href='login.html'">Sign In</button>
-            <button class="btn-primary" onclick="location.href='register.html'">Get Started</button>
+            <?php if($loggedIn): ?>
+                    <a style="text-decoration: none;" href="logout.php" class="btn-primary">Sign Out</a>
+                <?php else: ?>
+                    <a href="login.html" class="btn-ghost">Sign In</a>
+                    <a href="register.html" class="btn-primary">Get Started</a>
+                <?php endif; ?>
         </div>
     </nav>
 
@@ -49,8 +57,12 @@
             <p class="hero-sub">MeetVerse gives corporate teams a disciplined framework for scheduling and managing
                 meetings - with conflict prevention, attendance tracking, and reporting all enforced at one place.</p>
             <div class="hero-cta">
+                <?php if($loggedIn): ?>
+                    <a href="<?= $dash ?>" class="btn-lg solid">Go to Dashboard</a>
+                <?php else: ?>
                 <a href="login.html" class="btn-lg solid">Schedule a Meeting</a>
-                <a href="index.html#features" class="btn-lg outline">Explore Features</a>
+                <a href="index.php#features" class="btn-lg outline">Explore Features</a>
+                <?php endif; ?>
             </div>
         </div>
     </section>
@@ -97,13 +109,6 @@
 
     <footer>
         <span class="footer-copy">© 2025 MeetVerse · Built with php + Oracle PL/SQL</span>
-        <div class="footer-links">
-            <a href="">Dashboard</a>
-            <a href="">Meetings</a>
-            <a href="">Reports</a>
-            <a href="">Admin</a>
-        </div>
     </footer>
 </body>
-
 </html>

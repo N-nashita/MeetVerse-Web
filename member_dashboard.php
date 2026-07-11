@@ -78,7 +78,7 @@ $scheduledMeetings = $scheduledStmt->fetchAll(PDO::FETCH_ASSOC);
   <div class="dashboard-layout">
 
     <aside class="sidebar">
-      <a href="index.html" class="sidebar-logo">
+      <a href="index.php" class="sidebar-logo">
         <div class="logo-icon">M</div>
             <span class="logo-text">Meet<span>Verse</span></span>
       </a>

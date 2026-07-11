@@ -100,81 +100,11 @@ function statusClass($status) {
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Moon+Dance&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <style>
-    .meeting-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1rem;
-    }
-    .meeting-card {
-      background: var(--card-bg, #f1f0ff);
-      border: 1px solid var(--border, #e5e7eb);
-      border-radius: 12px;
-      padding: 1.1rem 1.2rem;
-    }
-    .meeting-card-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 0.5rem;
-    }
-    .meeting-card h4 { color: var(--text, #1f2937); margin: 0 0 0.3rem 0; font-size: 1rem; }
-    .meeting-card p.desc { color: var(--muted); font-size: 0.85rem; margin: 0.3rem 0 0.8rem 0; }
-    .meeting-meta { font-size: 0.78rem; color: var(--muted); display: flex; flex-direction: column; gap: 0.2rem; }
-    .status-pill {
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 0.2rem 0.6rem;
-      border-radius: 999px;
-      white-space: nowrap;
-    }
-    .status-ongoing   { background: #dcfce7; color: #15803d; }
-    .status-scheduled { background: #dbeafe; color: #1d4ed8; }
-    .status-completed { background: #f1f5f9; color: #475569; }
-    .status-cancelled { background: #fee2e2; color: #b91c1c; }
-
-    .filter-bar {
-      display: flex;
-      gap: 0.8rem;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 1.2rem;
-    }
-    .filter-bar select {
-      padding: 0.4rem 0.7rem;
-      border-radius: 8px;
-      border: 1px solid var(--border, #e5e7eb);
-      font-size: 0.85rem;
-      background: #fff;
-    }
-    .filter-bar label {
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-    .card-actions {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 0.8rem;
-    }
-    .card-actions form { margin: 0; }
-    .btn-cancel-meeting {
-      font-size: 0.78rem;
-      padding: 0.3rem 0.7rem;
-      background: #fee2e2;
-      color: #b91c1c;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-  </style>
 </head>
 <body>
   <div class="dashboard-layout">
     <aside class="sidebar">
-      <a href="index.html" class="sidebar-logo">
+      <a href="index.php" class="sidebar-logo">
         <div class="logo-icon">M</div>
         <span class="logo-text">Meet<span>Verse</span></span>
       </a>

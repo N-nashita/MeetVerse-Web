@@ -26,7 +26,7 @@ $employees = $empStmt->fetchAll(PDO::FETCH_ASSOC);
 <body>
   <div class="dashboard-layout">
     <aside class="sidebar">
-      <a href="index.html" class="sidebar-logo">
+      <a href="index.php" class="sidebar-logo">
         <div class="logo-icon">M</div>
         <span class="logo-text">Meet<em>Verse</em></span>
       </a>

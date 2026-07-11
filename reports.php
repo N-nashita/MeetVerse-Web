@@ -98,7 +98,7 @@ $recentEmps = $recentEmpStmt->fetchAll(PDO::FETCH_ASSOC);
 
   <div class="dashboard-layout">
     <aside class="sidebar">
-      <a href="index.html" class="sidebar-logo">
+      <a href="index.php" class="sidebar-logo">
         <div class="logo-icon">M</div>
         <span class="logo-text">Meet<span>Verse</span></span>
       </a>
@@ -137,8 +137,10 @@ $recentEmps = $recentEmpStmt->fetchAll(PDO::FETCH_ASSOC);
 
     <main class="main-content">
       <div class="page-header">
-        <h1>Reports</h1>
-        <p>Overview of meetings, employees, and activity across MeetVerse.</p>
+        <div class="page-header-text">
+          <h1>Reports</h1>
+          <p>Overview of meetings, employees, and activity across MeetVerse.</p>
+        </div>
       </div>
 
       <!-- Meeting Summary -->
