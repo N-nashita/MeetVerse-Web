@@ -81,8 +81,6 @@ $ongoingMeetings = $ongoingStmt->fetchAll(PDO::FETCH_ASSOC);
       <a class="nav-item" href="employees.php">
         <span class="icon">👥</span> Employees
       </a>
-
-      <span class="nav-label">Reports</span>
       <a class="nav-item" href="reports.php">
         <span class="icon">📋</span> Reports
       </a>

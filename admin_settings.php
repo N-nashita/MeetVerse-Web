@@ -59,13 +59,12 @@ $success = $_GET['success'] ?? '';
     <aside class="sidebar">
       <a href="index.html" class="sidebar-logo">
         <div class="logo-icon">M</div>
-        <span>Meet<em>Verse</em></span>
+        <span class="logo-text">Meet<span>Verse</span></span>
       </a>
       <span class="nav-label">Main</span>
       <a class="nav-item" href="admin_dashboard.php"><span class="icon">⊞</span> Dashboard</a>
       <a class="nav-item" href="create_meeting.php"><span class="icon">📅</span> Meetings</a>
       <a class="nav-item" href="employees.php"><span class="icon">👥</span> Employees</a>
-      <span class="nav-label">Reports</span>
       <a class="nav-item" href="reports.php"><span class="icon">📋</span> Reports</a>
       <span class="nav-label">System</span>
       <a class="nav-item active" href="admin_settings.php"><span class="icon">⚙️</span> Settings</a>

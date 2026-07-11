@@ -188,7 +188,6 @@ function statusClass($status) {
       <a class="nav-item" href="employees.php">
         <span class="icon">👥</span> Employees
       </a>
-      <span class="nav-label">Reports</span>
       <a class="nav-item" href="reports.php">
         <span class="icon">📋</span> Reports
       </a>
@@ -197,7 +196,7 @@ function statusClass($status) {
       <a class="nav-item" href="<?= $settingsPage ?>">
         <span class="icon">⚙️</span> Settings
       </a>
-      
+
       <div class="sidebar-footer">
         <div class="user-pill">
           <div class="user-avatar">

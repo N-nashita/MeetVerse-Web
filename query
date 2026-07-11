@@ -72,6 +72,27 @@ BEGIN
 END;
 /
 
+-- Helper: count active meetings that overlap a requested time window
+CREATE OR REPLACE FUNCTION has_meeting_time_conflict(
+    p_start_time         IN DATE,
+    p_end_time           IN DATE,
+    p_exclude_meeting_id IN NUMBER DEFAULT NULL
+) RETURN NUMBER
+IS
+    v_conflict NUMBER;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_conflict
+    FROM meetings m
+    WHERE UPPER(NVL(m.status, '')) <> 'CANCELLED'
+      AND p_start_time < m.end_time
+      AND p_end_time > m.start_time
+      AND (p_exclude_meeting_id IS NULL OR m.meeting_id <> p_exclude_meeting_id);
+
+    RETURN v_conflict;
+END;
+/
+
 -- 3. TRIGGER: reject bad meeting time ranges at the database level
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE TRIGGER trg_meeting_time_check
@@ -104,6 +125,10 @@ IS
     v_token    VARCHAR2(20);
 BEGIN
     p_meeting_id := meeting_seq.NEXTVAL;
+
+    IF has_meeting_time_conflict(p_start_time, p_end_time) > 0 THEN
+        RAISE_APPLICATION_ERROR(-20010, 'Meeting time overlaps an existing meeting.');
+    END IF;
 
     INSERT INTO meetings (
         meeting_id, title, description, department,
@@ -207,6 +232,10 @@ BEGIN
 
     IF v_status = 'Cancelled' THEN
         RAISE_APPLICATION_ERROR(-20002, 'Cancelled meetings cannot be edited.');
+    END IF;
+
+    IF has_meeting_time_conflict(p_start_time, p_end_time, p_meeting_id) > 0 THEN
+        RAISE_APPLICATION_ERROR(-20010, 'Meeting time overlaps an existing meeting.');
     END IF;
 
     UPDATE meetings
@@ -450,5 +479,72 @@ BEGIN
             'You have been invited to: "' || v_title || '"');
 EXCEPTION
     WHEN OTHERS THEN NULL;
+END;
+/
+
+-- Check conflict for attendee
+CREATE OR REPLACE FUNCTION check_attendee_conflict(
+    p_emp_id NUMBER,
+    p_meeting_id NUMBER
+) RETURN VARCHAR2 AS
+    v_start DATE;
+    v_end DATE;
+    v_conflict NUMBER;
+BEGIN
+    SELECT start_time, end_time INTO v_start, v_end FROM meetings WHERE meeting_id = p_meeting_id;
+    SELECT COUNT(*) INTO v_conflict
+    FROM meetings m
+    JOIN attendance a ON m.meeting_id= a.meeting_id
+    WHERE a.emp_id = p_emp_id
+    AND a.meeting_id != p_meeting_id
+    AND m.status != 'Cancelled'
+    AND v_start < m.end_time AND v_end > m.start_time;
+
+    IF v_conflict > 0 THEN
+        RETURN 'CONFLICT';
+    END IF;
+
+    INSERT INTO attendance (attendance_id, meeting_id, emp_id, status) VALUES (attendance_seq.NEXTVAL, p_meeting_id, p_emp_id, 'INVITED');
+    COMMIT;
+    RETURN 'SUCCESS';
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RETURN 'ERROR';
+END;
+/
+
+CREATE OR REPLACE PROCEDURE create_meeting_with_attendees (
+        p_title         IN VARCHAR2,
+        p_description   IN VARCHAR2,
+        p_department    IN VARCHAR2,
+        p_start_time    IN DATE,
+        p_end_time      IN DATE,
+        p_organizer_id  IN NUMBER,
+        p_meeting_id    OUT NUMBER
+    )
+IS
+BEGIN
+    p_meeting_id := meeting_seq.NEXTVAL;
+
+    IF has_meeting_time_conflict(p_start_time, p_end_time) > 0 THEN
+        RAISE_APPLICATION_ERROR(-20010, 'Meeting time overlaps an existing meeting.');
+    END IF;
+
+    INSERT INTO meetings (
+        meeting_id, title, description, department,
+        start_time, end_time, organizer_id, status
+    ) VALUES (
+        p_meeting_id, p_title, p_description, p_department,
+        p_start_time, p_end_time, p_organizer_id, 'Scheduled'
+    );
+
+    INSERT INTO attendance (attendance_id, meeting_id, emp_id, status)
+    VALUES (attendance_seq.NEXTVAL, p_meeting_id, p_organizer_id, 'Accepted');
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE;
 END;
 /

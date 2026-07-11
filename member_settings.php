@@ -33,7 +33,7 @@ $success = $_GET['success'] ?? '';
     <aside class="sidebar">
       <a href="index.html" class="sidebar-logo">
         <div class="logo-icon">M</div>
-        <span class="logo-text">Meet<em>Verse</em></span>
+        <span class="logo-text">Meet<span>Verse</span></span>
       </a>
       <span class="nav-label"> Main </span>
       <a class="nav-item" href="admin_dashboard.php">
@@ -79,6 +79,46 @@ $success = $_GET['success'] ?? '';
       <?php endif; ?>
 
       <div class="settings-grid">
+
+        <!-- Notifications -->
+        <div class="settings-card full">
+          <div class="card-header">
+            <div>
+              <h3>Notifications <?php if($unread > 0): ?><span class="unread-badge"><?= $unread ?></span><?php endif; ?></h3>
+              <p>Meeting invitations and updates</p>
+            </div>
+            <?php if($unread > 0): ?>
+            <form method="POST" action="settings_action.php" style="margin:0">
+              <input type="hidden" name="action" value="mark_all_read">
+              <button type="submit" class="btn-sm">Mark all read</button>
+            </form>
+            <?php endif; ?>
+          </div>
+          <div class="card-body">
+            <?php if(count($notifs) > 0): ?>
+              <?php foreach($notifs as $n): $read = $n['IS_READ'] == 1; ?>
+              <div class="notif-item">
+                <div class="notif-dot <?= $read ? 'read' : '' ?>"></div>
+                <div style="flex:1">
+                  <div class="notif-msg <?= $read ? 'read' : '' ?>"><?= htmlspecialchars($n['MESSAGE']) ?></div>
+                  <?php if(!$read): ?>
+                  <div class="notif-actions">
+                    <form method="POST" action="settings_action.php" style="margin:0">
+                      <input type="hidden" name="action" value="mark_read">
+                      <input type="hidden" name="notif_id" value="<?= $n['NOTIF_ID'] ?>">
+                      <button type="submit" class="btn-sm">Mark as read</button>
+                    </form>
+                  </div>
+                  <?php endif; ?>
+                </div>
+                <span class="notif-time"><?= date('M d, H:i', strtotime($n['CREATED_AT'])) ?></span>
+              </div>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <div class="empty-note">No notifications yet.</div>
+            <?php endif; ?>
+          </div>
+        </div>
 
         <!-- Profile info -->
         <div class="settings-card">
@@ -138,46 +178,6 @@ $success = $_GET['success'] ?? '';
               </div>
               <button type="submit" class="btn-save">Change Password</button>
             </form>
-          </div>
-        </div>
-
-        <!-- Notifications -->
-        <div class="settings-card full">
-          <div class="card-header">
-            <div>
-              <h3>Notifications <?php if($unread > 0): ?><span class="unread-badge"><?= $unread ?></span><?php endif; ?></h3>
-              <p>Meeting invitations and updates</p>
-            </div>
-            <?php if($unread > 0): ?>
-            <form method="POST" action="settings_action.php" style="margin:0">
-              <input type="hidden" name="action" value="mark_all_read">
-              <button type="submit" class="btn-sm">Mark all read</button>
-            </form>
-            <?php endif; ?>
-          </div>
-          <div class="card-body">
-            <?php if(count($notifs) > 0): ?>
-              <?php foreach($notifs as $n): $read = $n['IS_READ'] == 1; ?>
-              <div class="notif-item">
-                <div class="notif-dot <?= $read ? 'read' : '' ?>"></div>
-                <div style="flex:1">
-                  <div class="notif-msg <?= $read ? 'read' : '' ?>"><?= htmlspecialchars($n['MESSAGE']) ?></div>
-                  <?php if(!$read): ?>
-                  <div class="notif-actions">
-                    <form method="POST" action="settings_action.php" style="margin:0">
-                      <input type="hidden" name="action" value="mark_read">
-                      <input type="hidden" name="notif_id" value="<?= $n['NOTIF_ID'] ?>">
-                      <button type="submit" class="btn-sm">Mark as read</button>
-                    </form>
-                  </div>
-                  <?php endif; ?>
-                </div>
-                <span class="notif-time"><?= date('M d, H:i', strtotime($n['CREATED_AT'])) ?></span>
-              </div>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <div class="empty-note">No notifications yet.</div>
-            <?php endif; ?>
           </div>
         </div>
 
