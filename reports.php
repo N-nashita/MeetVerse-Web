@@ -11,9 +11,9 @@ if (!isset($_SESSION['emp_id'])) {
 $summaryStmt = $pdo->query("
     SELECT 
         COUNT(*) AS total,
-        SUM(CASE WHEN status = 'SCHEDULED' THEN 1 ELSE 0 END) AS scheduled,
-        SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
-        SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled
+        SUM(CASE WHEN status = 'Scheduled' THEN 1 ELSE 0 END) AS scheduled,
+        SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) AS completed,
+        SUM(CASE WHEN status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled
     FROM meetings
 ");
 $summary = $summaryStmt->fetch(PDO::FETCH_ASSOC);
@@ -66,7 +66,7 @@ $upcomingStmt = $pdo->query("
                e.first_name || ' ' || e.last_name AS organizer
         FROM meetings m
         JOIN employees e ON e.emp_id = m.organizer_id
-        WHERE m.start_time > SYSDATE AND m.status = 'SCHEDULED'
+        WHERE m.start_time > SYSDATE AND m.status = 'Scheduled'
         ORDER BY m.start_time ASC
     ) WHERE ROWNUM <= 10
 ");

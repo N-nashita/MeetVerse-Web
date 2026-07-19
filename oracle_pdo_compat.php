@@ -6,6 +6,7 @@ class OraclePdoCompatStatement
     private $sql;
     private $statement;
     private $bindings = [];
+    private $boundValues = [];
 
     public function __construct($connection, $sql)
     {
@@ -48,15 +49,16 @@ class OraclePdoCompatStatement
             $this->throwLastError('Could not prepare Oracle statement.');
         }
 
+        $this->boundValues = [];
         foreach ($this->bindings as $parameter => &$binding) {
             if ($binding['reference']) {
-                $variable =& $binding['value'];
+                $this->boundValues[$parameter] =& $binding['value'];
             } else {
-                $variable = $binding['value'];
+                $this->boundValues[$parameter] = $binding['value'];
             }
 
             $length = $binding['length'] > 0 ? $binding['length'] : -1;
-            oci_bind_by_name($this->statement, $parameter, $variable, $length);
+            oci_bind_by_name($this->statement, $parameter, $this->boundValues[$parameter], $length);
         }
         unset($binding);
 

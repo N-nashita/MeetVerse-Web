@@ -37,82 +37,48 @@ CREATE TABLE attendance (
     CONSTRAINT fk_emp FOREIGN KEY (emp_id) REFERENCES employees(emp_id)
 );
 
--- FUNCTION: compute a meeting's live status from its timestamps
-CREATE OR REPLACE FUNCTION get_meeting_status (
-    p_start_time IN DATE,
-    p_end_time   IN DATE,
-    p_status     IN VARCHAR2
-) RETURN VARCHAR2
-IS
-BEGIN
-    IF p_status = 'Cancelled' THEN
-        RETURN 'Cancelled';
-    END IF;
+-- Notification table
+CREATE SEQUENCE notif_seq START WITH 1 INCREMENT BY 1;
 
-    IF SYSDATE < p_start_time THEN
-        RETURN 'Scheduled';
-    ELSIF SYSDATE BETWEEN p_start_time AND p_end_time THEN
-        RETURN 'Ongoing';
-    ELSE
-        RETURN 'Completed';
-    END IF;
-END;
-/
+CREATE TABLE notifications (
+    notif_id   NUMBER PRIMARY KEY,
+    emp_id     NUMBER NOT NULL,
+    message    VARCHAR2(500),
+    is_read    NUMBER(1) DEFAULT 0,
+    created_at DATE DEFAULT SYSDATE,
+    CONSTRAINT fk_notif_emp FOREIGN KEY (emp_id) REFERENCES employees(emp_id)
+);
 
---  PROCEDURE: refresh every meeting's status in one pass
---    Called once per dashboard/meetings-page load.
+-- Log table
+CREATE SEQUENCE log_seq START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE activity_log (
+    log_id     NUMBER PRIMARY KEY,
+    action     VARCHAR2(50),
+    details    VARCHAR2(500),
+    emp_id     NUMBER,
+    created_at DATE DEFAULT SYSDATE
+);
+
+
 CREATE OR REPLACE PROCEDURE refresh_meeting_statuses
 IS
 BEGIN
     UPDATE meetings
     SET status = get_meeting_status(start_time, end_time, status)
     WHERE status != 'Cancelled';
-
     COMMIT;
 END;
 /
 
--- Helper: count active meetings that overlap a requested time window
-CREATE OR REPLACE FUNCTION has_meeting_time_conflict(
-    p_start_time         IN DATE,
-    p_end_time           IN DATE,
-    p_exclude_meeting_id IN NUMBER DEFAULT NULL
-) RETURN NUMBER
-IS
-    v_conflict NUMBER;
-BEGIN
-    SELECT COUNT(*)
-    INTO v_conflict
-    FROM meetings m
-    WHERE UPPER(NVL(m.status, '')) <> 'CANCELLED'
-      AND p_start_time < m.end_time
-      AND p_end_time > m.start_time
-      AND (p_exclude_meeting_id IS NULL OR m.meeting_id <> p_exclude_meeting_id);
 
-    RETURN v_conflict;
-END;
-/
+
 
 -- Collection type for attendee ids passed from PHP
 CREATE OR REPLACE TYPE attendee_id_table AS TABLE OF NUMBER;
 /
 
--- 3. TRIGGER: reject bad meeting time ranges at the database level
--- ---------------------------------------------------------------------
-CREATE OR REPLACE TRIGGER trg_meeting_time_check
-BEFORE INSERT OR UPDATE ON meetings
-FOR EACH ROW
-BEGIN
-    IF :NEW.end_time <= :NEW.start_time THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Meeting end time must be after start time.');
-    END IF;
-END;
-/
-
--- ---------------------------------------------------------------------
--- 4. PROCEDURE: create a meeting plus all attendance rows atomically
---    p_attendee_csv: comma-separated emp_ids, e.g. '2,5,7' or NULL/''
--- ---------------------------------------------------------------------
+-- PROCEDURE: create a meeting plus all attendance rows atomically
 CREATE OR REPLACE PROCEDURE create_meeting_with_attendees (
     p_title         IN VARCHAR2,
     p_description   IN VARCHAR2,
@@ -171,53 +137,10 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
-        RAISE;
 END;
 /
 
--- ---------------------------------------------------------------------
--- 5. PROCEDURE: cancel a meeting (organizer-only check enforced in PHP,
---    but the procedure itself just performs the state change)
--- ---------------------------------------------------------------------
-CREATE OR REPLACE PROCEDURE cancel_meeting (
-    p_meeting_id IN NUMBER
-)
-IS
-BEGIN
-    UPDATE meetings
-    SET status = 'Cancelled'
-    WHERE meeting_id = p_meeting_id;
-
-    IF SQL%ROWCOUNT = 0 THEN
-        RAISE_APPLICATION_ERROR(-20002, 'Meeting not found.');
-    END IF;
-
-    COMMIT;
-END;
-/
-
--- ---------------------------------------------------------------------
--- 6. VIEW: convenience view joining meetings with organizer name
---    and attendee count, used by the dashboard/meetings pages
--- ---------------------------------------------------------------------
-CREATE OR REPLACE VIEW meeting_overview AS
-SELECT
-    m.meeting_id,
-    m.title,
-    m.description,
-    m.department,
-    m.start_time,
-    m.end_time,
-    m.status,
-    m.organizer_id,
-    e.first_name || ' ' || e.last_name AS organizer_name,
-    (SELECT COUNT(*) FROM attendance a WHERE a.meeting_id = m.meeting_id) AS attendee_count
-FROM meetings m
-JOIN employees e ON e.emp_id = m.organizer_id;
-
--- ============================================
--- 1. UPDATE meeting (organizer only, resyncs attendees)
--- ============================================
+-- UPDATE meeting (organizer only, resyncs attendees)
 CREATE OR REPLACE PROCEDURE update_meeting_with_attendees (
     p_meeting_id     IN meetings.meeting_id%TYPE,
     p_requester_id   IN employees.emp_id%TYPE,
@@ -282,14 +205,12 @@ EXCEPTION
     WHEN NO_DATA_FOUND THEN
         RAISE_APPLICATION_ERROR(-20003, 'Meeting not found.');
     WHEN OTHERS THEN
-        ROLLBACK; RAISE;
+        ROLLBACK;
 END update_meeting_with_attendees;
 /
 
--- ============================================
--- 2. CANCEL (soft delete) — organizer only
---    Replaces the earlier 1-arg cancel_meeting entirely (name-based replace)
--- ============================================
+-- CANCEL (soft delete) — organizer only
+-- Replaces the earlier 1-arg cancel_meeting entirely (name-based replace)]
 CREATE OR REPLACE PROCEDURE cancel_meeting (
     p_meeting_id   IN meetings.meeting_id%TYPE,
     p_requester_id IN employees.emp_id%TYPE
@@ -309,14 +230,11 @@ EXCEPTION
     WHEN NO_DATA_FOUND THEN
         RAISE_APPLICATION_ERROR(-20003, 'Meeting not found.');
     WHEN OTHERS THEN
-        ROLLBACK; RAISE;
+        ROLLBACK;
 END cancel_meeting;
 /
 
--- ============================================
--- 3. Filter + sort meetings, returns REF CURSOR
---    (uses attendance, not meeting_participants)
--- ============================================
+-- 3. Filter + sort meetings, returns REF CURSOR (uses attendance, not meeting_participants)
 CREATE OR REPLACE PROCEDURE get_filtered_meetings (
     p_emp_id      IN employees.emp_id%TYPE,
     p_status      IN VARCHAR2 DEFAULT 'ALL',
@@ -330,12 +248,12 @@ BEGIN
     refresh_meeting_statuses;
 
     v_sql := 'SELECT meeting_id, title, description, department, start_time, end_time,
-                     status, organizer_id, organizer_name, attendee_count
-              FROM meeting_overview
-              WHERE (:st1 = ''ALL'' OR status = :st2)
-                AND (:dp1 = ''ALL'' OR department = :dp2)
-                AND (:mine != ''Y'' OR organizer_id = :eid1
-                     OR meeting_id IN (SELECT meeting_id FROM attendance WHERE emp_id = :eid2))';
+            status, organizer_id, organizer_name, attendee_count
+            FROM meeting_overview
+            WHERE (:st1 = ''ALL'' OR status = :st2)
+            AND (:dp1 = ''ALL'' OR department = :dp2)
+            AND (:mine != ''Y'' OR organizer_id = :eid1
+            OR meeting_id IN (SELECT meeting_id FROM attendance WHERE emp_id = :eid2))';
 
     v_sql := v_sql || CASE p_sort
         WHEN 'start_asc'  THEN ' ORDER BY start_time ASC'
@@ -367,192 +285,6 @@ BEGIN
     END;
     OPEN p_cursor FOR v_sql USING p_department, p_department;
 END get_filtered_members;
-/
-
--- Log table
-CREATE SEQUENCE log_seq START WITH 1 INCREMENT BY 1;
-
-CREATE TABLE activity_log (
-    log_id     NUMBER PRIMARY KEY,
-    action     VARCHAR2(50),
-    details    VARCHAR2(500),
-    emp_id     NUMBER,
-    created_at DATE DEFAULT SYSDATE
-);
-
--- Trigger: log new employee
-CREATE OR REPLACE TRIGGER trg_log_new_employee
-AFTER INSERT ON employees
-FOR EACH ROW
-BEGIN
-    INSERT INTO activity_log (log_id, action, details, emp_id)
-    VALUES (log_seq.NEXTVAL, 'NEW EMPLOYEE',
-            :NEW.first_name || ' ' || :NEW.last_name || ' joined ' || :NEW.department,
-            :NEW.emp_id);
-END;
-/
-
--- Trigger: log new meeting
-CREATE OR REPLACE TRIGGER trg_log_new_meeting
-AFTER INSERT ON meetings
-FOR EACH ROW
-DECLARE 
-    o_name VARCHAR2(100);
-BEGIN
-    SELECT first_name INTO o_name FROM employees WHERE emp_id = :NEW.organizer_id;
-    INSERT INTO activity_log (log_id, action, details, emp_id) VALUES (log_seq.NEXTVAL, 'NEW MEETING', 'New meeting "' || :NEW.title || '" launched by ' || o_name, :NEW.organizer_id);
-END;
-/
-
--- Trigger: log cancelled meeting
-CREATE OR REPLACE TRIGGER trg_log_cancel_meeting
-AFTER UPDATE OF status ON meetings
-FOR EACH ROW
-WHEN (NEW.status = 'Cancelled')
-BEGIN
-    INSERT INTO activity_log (log_id, action, details, emp_id)
-    VALUES (log_seq.NEXTVAL, 'MEETING CANCELLED',
-            'Meeting "' || :NEW.title || '" was cancelled',
-            :NEW.organizer_id);
-END;
-/
-
--- Procedure: change password
-CREATE OR REPLACE FUNCTION change_password(
-    p_emp_id IN NUMBER,
-    P_new_pass IN VARCHAR2
-) RETURN VARCHAR2 AS
-BEGIN
-    UPDATE employees SET password = p_new_pass WHERE emp_id = p_emp_id;
-    IF SQL%ROWCOUNT = 0 THEN
-        RETURN 'NOT_FOUND';
-    END IF;
-    COMMIT;
-    RETURN 'SUCCESS';
-EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RETURN 'ERROR';
-END;
-/
-
-
--- Procedure: update name
-CREATE OR REPLACE FUNCTION update_employee_name(
-    p_emp_id IN NUMBER,
-    p_first_name IN VARCHAR2,
-    p_last_name IN VARCHAR2
-) RETURN VARCHAR2 AS
-BEGIN
-    UPDATE employees SET first_name = p_first_name, last_name = p_last_name WHERE emp_id = p_emp_id;
-    COMMIT;
-    RETURN 'SUCCESS';
-EXCEPTION
-    WHEN OTHERS THEN
-    ROLLBACK;
-    RETURN 'ERROR';
-END;
-/
-
--- Procedure: update department (admin only)
-CREATE OR REPLACE FUNCTION update_employee_department(
-    p_emp_id IN NUMBER,
-    p_dept IN VARCHAR2
-) RETURN VARCHAR2 AS
-BEGIN
-    UPDATE employees SET department = p_dept WHERE emp_id = p_emp_id;
-    IF SQL%ROWCOUNT = 0 THEN
-    RETURN 'NOT FOUND';
-    ELSE
-        COMMIT;
-        RETURN 'SUCCESS';
-    END IF;
-EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RETURN 'ERROR';
-END;
-/
-
--- Procedure: remove employee (admin only)
-CREATE OR REPLACE FUNCTION remove_employee(
-    p_emp_id IN NUMBER
-) RETURN VARCHAR2 AS
-BEGIN
-    DELETE FROM attendance WHERE emp_id = p_emp_id;
-    DELETE FROM notifications WHERE emp_id = p_emp_id;
-    DELETE FROM employees WHERE emp_id = p_emp_id;
-    IF SQL%ROWCOUNT = 0 THEN
-        RETURN 'NOT_FOUND';
-    ELSE
-        COMMIT;
-        RETURN 'SUCCESS';
-    END IF;
-EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RETURN 'ERROR';
-END;
-/
-
--- Notification table
-CREATE SEQUENCE notif_seq START WITH 1 INCREMENT BY 1;
-
-CREATE TABLE notifications (
-    notif_id   NUMBER PRIMARY KEY,
-    emp_id     NUMBER NOT NULL,
-    message    VARCHAR2(500),
-    is_read    NUMBER(1) DEFAULT 0,
-    created_at DATE DEFAULT SYSDATE,
-    CONSTRAINT fk_notif_emp FOREIGN KEY (emp_id) REFERENCES employees(emp_id)
-);
-
--- Trigger: notify attendee when invited to meeting
-CREATE OR REPLACE TRIGGER trg_notify_attendee
-AFTER INSERT ON attendance
-FOR EACH ROW
-DECLARE
-    v_title VARCHAR2(200);
-BEGIN
-    SELECT title INTO v_title FROM meetings WHERE meeting_id = :NEW.meeting_id;
-    INSERT INTO notifications (notif_id, emp_id, message)
-    VALUES (notif_seq.NEXTVAL, :NEW.emp_id,
-            'You have been invited to: "' || v_title || '"');
-EXCEPTION
-    WHEN OTHERS THEN NULL;
-END;
-/
-
--- Check conflict for attendee
-CREATE OR REPLACE FUNCTION check_attendee_conflict(
-    p_emp_id NUMBER,
-    p_meeting_id NUMBER
-) RETURN VARCHAR2 AS
-    v_start DATE;
-    v_end DATE;
-    v_conflict NUMBER;
-BEGIN
-    SELECT start_time, end_time INTO v_start, v_end FROM meetings WHERE meeting_id = p_meeting_id;
-    SELECT COUNT(*) INTO v_conflict
-    FROM meetings m
-    JOIN attendance a ON m.meeting_id= a.meeting_id
-    WHERE a.emp_id = p_emp_id
-    AND a.meeting_id != p_meeting_id
-    AND m.status != 'Cancelled'
-    AND v_start < m.end_time AND v_end > m.start_time;
-
-    IF v_conflict > 0 THEN
-        RETURN 'CONFLICT';
-    END IF;
-
-    INSERT INTO attendance (attendance_id, meeting_id, emp_id, status) VALUES (attendance_seq.NEXTVAL, p_meeting_id, p_emp_id, 'INVITED');
-    COMMIT;
-    RETURN 'SUCCESS';
-EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RETURN 'ERROR';
-END;
 /
 
 CREATE OR REPLACE PROCEDURE create_meeting_with_attendees (
@@ -612,6 +344,246 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
-        RAISE;
+END;
+/
+
+
+
+
+-- FUNCTION: compute a meeting's live status from its timestamps
+CREATE OR REPLACE FUNCTION get_meeting_status (
+    p_start_time IN DATE,
+    p_end_time   IN DATE,
+    p_status     IN VARCHAR2
+) RETURN VARCHAR2
+IS
+BEGIN
+    IF p_status = 'Cancelled' THEN
+        RETURN 'Cancelled';
+    END IF;
+
+    IF SYSDATE < p_start_time THEN
+        RETURN 'Scheduled';
+    ELSIF SYSDATE BETWEEN p_start_time AND p_end_time THEN
+        RETURN 'Ongoing';
+    ELSE
+        RETURN 'Completed';
+    END IF;
+END;
+/
+
+-- Helper: count active meetings that overlap a requested time window
+CREATE OR REPLACE FUNCTION has_meeting_time_conflict(
+    p_start_time         IN DATE,
+    p_end_time           IN DATE,
+    p_exclude_meeting_id IN NUMBER DEFAULT NULL
+) RETURN NUMBER
+IS
+    v_conflict NUMBER;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_conflict
+    FROM meetings m
+    WHERE UPPER(NVL(m.status, '')) <> 'CANCELLED'
+      AND p_start_time < m.end_time
+      AND p_end_time > m.start_time
+      AND (p_exclude_meeting_id IS NULL OR m.meeting_id <> p_exclude_meeting_id);
+
+    RETURN v_conflict;
+END;
+/
+
+-- Function: change password
+CREATE OR REPLACE FUNCTION change_password(
+    p_emp_id IN NUMBER,
+    P_new_pass IN VARCHAR2
+) RETURN VARCHAR2 AS
+BEGIN
+    UPDATE employees SET password = p_new_pass WHERE emp_id = p_emp_id;
+    IF SQL%ROWCOUNT = 0 THEN
+        RETURN 'NOT_FOUND';
+    END IF;
+    COMMIT;
+    RETURN 'SUCCESS';
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RETURN 'ERROR';
+END;
+/
+
+
+-- Function: update name
+CREATE OR REPLACE FUNCTION update_employee_name(
+    p_emp_id IN NUMBER,
+    p_first_name IN VARCHAR2,
+    p_last_name IN VARCHAR2
+) RETURN VARCHAR2 AS
+BEGIN
+    UPDATE employees SET first_name = p_first_name, last_name = p_last_name WHERE emp_id = p_emp_id;
+    COMMIT;
+    RETURN 'SUCCESS';
+EXCEPTION
+    WHEN OTHERS THEN
+    ROLLBACK;
+    RETURN 'ERROR';
+END;
+/
+
+-- Function: update department (admin only)
+CREATE OR REPLACE FUNCTION update_employee_department(
+    p_emp_id IN NUMBER,
+    p_dept IN VARCHAR2
+) RETURN VARCHAR2 AS
+BEGIN
+    UPDATE employees SET department = p_dept WHERE emp_id = p_emp_id;
+    IF SQL%ROWCOUNT = 0 THEN
+    RETURN 'NOT FOUND';
+    ELSE
+        COMMIT;
+        RETURN 'SUCCESS';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RETURN 'ERROR';
+END;
+/
+
+-- Function: remove employee (admin only)
+CREATE OR REPLACE FUNCTION remove_employee(
+    p_emp_id IN NUMBER
+) RETURN VARCHAR2 AS
+BEGIN
+    DELETE FROM attendance WHERE emp_id = p_emp_id;
+    DELETE FROM notifications WHERE emp_id = p_emp_id;
+    DELETE FROM employees WHERE emp_id = p_emp_id;
+    IF SQL%ROWCOUNT = 0 THEN
+        RETURN 'NOT_FOUND';
+    ELSE
+        COMMIT;
+        RETURN 'SUCCESS';
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RETURN 'ERROR';
+END;
+/
+
+-- Check conflict for attendee
+CREATE OR REPLACE FUNCTION check_attendee_conflict(
+    p_emp_id NUMBER,
+    p_meeting_id NUMBER
+) RETURN VARCHAR2 AS
+    v_start DATE;
+    v_end DATE;
+    v_conflict NUMBER;
+BEGIN
+    SELECT start_time, end_time INTO v_start, v_end FROM meetings WHERE meeting_id = p_meeting_id;
+    SELECT COUNT(*) INTO v_conflict
+    FROM meetings m
+    JOIN attendance a ON m.meeting_id= a.meeting_id
+    WHERE a.emp_id = p_emp_id
+    AND a.meeting_id != p_meeting_id
+    AND m.status != 'Cancelled'
+    AND v_start < m.end_time AND v_end > m.start_time;
+
+    IF v_conflict > 0 THEN
+        RETURN 'CONFLICT';
+    END IF;
+
+    INSERT INTO attendance (attendance_id, meeting_id, emp_id, status) VALUES (attendance_seq.NEXTVAL, p_meeting_id, p_emp_id, 'INVITED');
+    COMMIT;
+    RETURN 'SUCCESS';
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RETURN 'ERROR';
+END;
+/
+
+
+
+-- VIEW: convenience view joining meetings with organizer name and attendee count, used by the dashboard/meetings pages
+CREATE OR REPLACE VIEW meeting_overview AS
+SELECT
+    m.meeting_id,
+    m.title,
+    m.description,
+    m.department,
+    m.start_time,
+    m.end_time,
+    m.status,
+    m.organizer_id,
+    e.first_name || ' ' || e.last_name AS organizer_name,
+    (SELECT COUNT(*) FROM attendance a WHERE a.meeting_id = m.meeting_id) AS attendee_count
+FROM meetings m
+JOIN employees e ON e.emp_id = m.organizer_id;
+
+
+
+
+-- Trigger: activity log new employee
+CREATE OR REPLACE TRIGGER trg_log_new_employee
+AFTER INSERT ON employees
+FOR EACH ROW
+BEGIN
+    INSERT INTO activity_log (log_id, action, details, emp_id)
+    VALUES (log_seq.NEXTVAL, 'NEW EMPLOYEE',
+            :NEW.first_name || ' ' || :NEW.last_name || ' joined ' || :NEW.department,
+            :NEW.emp_id);
+END;
+/
+
+-- Trigger: activity log new meeting
+CREATE OR REPLACE TRIGGER trg_log_new_meeting
+AFTER INSERT ON meetings
+FOR EACH ROW
+DECLARE 
+    o_name VARCHAR2(100);
+BEGIN
+    SELECT first_name INTO o_name FROM employees WHERE emp_id = :NEW.organizer_id;
+    INSERT INTO activity_log (log_id, action, details, emp_id) VALUES (log_seq.NEXTVAL, 'NEW MEETING', 'New meeting "' || :NEW.title || '" launched by ' || o_name, :NEW.organizer_id);
+END;
+/
+
+-- Trigger: activity log cancelled meeting
+CREATE OR REPLACE TRIGGER trg_log_cancel_meeting
+AFTER UPDATE OF status ON meetings
+FOR EACH ROW
+WHEN (NEW.status = 'Cancelled')
+BEGIN
+    INSERT INTO activity_log (log_id, action, details, emp_id)
+    VALUES (log_seq.NEXTVAL, 'MEETING CANCELLED',
+            'Meeting "' || :NEW.title || '" was cancelled',
+            :NEW.organizer_id);
+END;
+/
+
+-- TRIGGER: reject bad meeting time ranges at the database level
+CREATE OR REPLACE TRIGGER trg_meeting_time_check
+BEFORE INSERT OR UPDATE ON meetings
+FOR EACH ROW
+BEGIN
+    IF :NEW.end_time <= :NEW.start_time THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Meeting end time must be after start time.');
+    END IF;
+END;
+/
+
+-- Trigger: notify attendee when invited to meeting
+CREATE OR REPLACE TRIGGER trg_notify_attendee
+AFTER INSERT ON attendance
+FOR EACH ROW
+DECLARE
+    v_title VARCHAR2(200);
+BEGIN
+    SELECT title INTO v_title FROM meetings WHERE meeting_id = :NEW.meeting_id;
+    INSERT INTO notifications (notif_id, emp_id, message)
+    VALUES (notif_seq.NEXTVAL, :NEW.emp_id,
+            'You have been invited to: "' || v_title || '"');
+EXCEPTION
+    WHEN OTHERS THEN NULL;
 END;
 /

@@ -210,12 +210,14 @@ function statusClass($status) {
 
               <?php if ($m['ORGANIZER_ID'] == $_SESSION['emp_id'] && $m['STATUS'] !== 'Cancelled'): ?>
                 <div class="card-actions">
+                  <?php if($m['STATUS']!=='Completed'): ?>
                   <a href="edit_meeting.php?id=<?= $m['MEETING_ID'] ?>" class="btn-cancel" style="text-decoration:none; font-size:0.78rem; padding:0.3rem 0.7rem;">Edit</a>
                   <form action="meeting_action.php" method="POST" onsubmit="return confirm('Cancel this meeting?');">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="meeting_id" value="<?= $m['MEETING_ID'] ?>">
                     <button type="submit" class="btn-cancel-meeting">Cancel</button>
                   </form>
+                  <?php endif; ?>
                 </div>
               <?php endif; ?>
             </div>
